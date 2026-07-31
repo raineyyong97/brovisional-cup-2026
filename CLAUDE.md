@@ -69,13 +69,28 @@ not the venue, so groupings stayed put.
 
 ## Flight rotation logic
 
-`DAILY_FLIGHTS` was hand-derived (not randomly generated) so that across the 4 days:
-- Every player shares a flight with every other player **at least once**.
-- Total Handicap Index per flight is balanced to within ~4 strokes each day.
-- It's mathematically provable that with 8 players / groups of 4 / 4 rounds, at least one pair
-  of players must repeat a flight 3 times (can't perfectly balance "everyone meets everyone
-  exactly once or twice" — the math doesn't divide evenly). The current schedule accepts that
-  trade-off rather than ever leaving a pair at zero shared flights.
+Days 1–2 are **history** — they were played and their scores are in the database. Never edit
+them. Days 3–4 were re-optimised by exhaustive search over all 35 × 35 possible splits.
+
+**"Everyone shares a flight with everyone twice" is impossible.** A player has 3 flight-mates a
+day, so at most 12 encounters over 4 days, while meeting all 7 others twice needs 14. With Kai
+out on day 3 there are 45 pair-slots total against the 56 required. Don't accept this as a
+requirement — it cannot be met.
+
+The exhaustive search also confirmed the original note: with 8 players in two flights of 4 over
+4 rounds, **no schedule avoids some pair meeting 3 times** (all 52,360 checked). The original
+hand-built schedule was nonetheless suboptimal — 4 pairs at 3× and 12 pairs at 1×, where the
+theoretical best was 20 pairs at 2× and 8 at 1×.
+
+Current schedule, chosen deliberately: **21 of 28 pairs share a flight exactly twice and no pair
+exceeds twice.** The accepted cost is 4 pairs who never share a flight — Bob+Weng, Daryl+Junyi,
+Rainey+Song, Kai+Wilson. The alternative (everyone meets at least once) was rejected because it
+drops to only 9 pairs at twice and forces 4 pairs to 3×.
+
+The binding constraint is Kai: he plays only days 1, 2 and 4, and his unmet pairs were Weng and
+Wilson. Covering both would force Weng+Wilson — already at 2 from days 1–2 — up to 3.
+
+Handicap balance per flight stays within ~1 stroke of average on both re-optimised days.
 
 If a player list changes (someone drops out, someone new joins), this rotation needs to be
 manually rebuilt, not just patched — it's an interlocking schedule, not independent daily
@@ -217,12 +232,21 @@ behind it.
 - **Course data is still unverified.** See the section above — this is now the largest remaining
   risk to the app being *correct* rather than merely working, since wrong ratings or stroke
   indexes silently produce wrong handicaps and wrong Stableford points all week.
-- **Unplayed days award a phantom Sixes bonus.** With no scores entered, all four players in a
-  flight tie on zero games won, so the tie-averaging in `computeSixes` hands everyone
-  `(5+2+0−2)/4 = 1.25`. Days 3 and 4 currently show 1.3 for every player, inflating trip totals
-  by 2.5 each. It self-corrects once scores are entered and it's uniform, so it doesn't change
-  the ranking — but the totals are wrong until the trip finishes. Fix would be to skip the bonus
-  entirely for a flight with no playable holes. Not done: it predates this work and nobody has
-  asked.
 - Live sync is verified end-to-end (realtime delivery, stale-write rejection, RLS enforcement).
   Days 1 and 2 are fully scored in the database.
+
+## Absences and short flights
+
+`ABSENT` lists players not playing on a given day (`{2: ['Kai']}` — Kai misses day 3). An absent
+player is left out of `DAILY_FLIGHTS` for that day entirely, scores 0, and renders as "not
+playing" in the day totals and "—" in the gross table.
+
+Day 3 therefore has 7 players split 4 + 3. A 3-player flight cannot play partners format, so
+`computeThreeWay` runs **3-way individual match play**: each hole goes to the outright lowest net
+(a tie for lowest halves the hole), most holes wins the 6-hole game, and the bonus slots are
+`[5, 2, −2]` rather than `[5, 2, 0, −2]`. `computeSixes` dispatches on flight length.
+
+`awardBonus` is shared by both formats and takes an `anyPlayable` count. This fixes a real bug:
+with no scores entered, every player tied on zero and the tie-averaging handed each of them
+`(5+2+0−2)/4 = 1.25` for a day that had not been played, inflating every trip total by 2.5.
+Unplayed days now award nothing. Don't remove that guard.

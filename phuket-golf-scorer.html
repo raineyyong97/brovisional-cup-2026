@@ -408,12 +408,30 @@ let PLAYERS = [
 // Day 2 Flight 2 is ordered Weng/Rainey/Junyi/Wilson because the group played
 // Weng+Rainey in holes 1–6, not Weng+Junyi. Everyone still partners each
 // flight-mate exactly once.
+// Days 1–2 are history — they have been played and their scores are in the
+// database, so those flights must never be edited. Days 3–4 were re-optimised
+// by exhaustive search over all 35 x 35 possible splits.
+//
+// "Everyone shares a flight with everyone twice" is impossible: a player has 3
+// flight-mates a day, so at most 12 encounters over 4 days, while meeting all 7
+// others twice needs 14. Kai plays 3 days, giving him 9. The chosen schedule
+// instead maximises pairs at exactly two and caps everyone at two — 21 of 28
+// pairs share a flight exactly twice and no pair exceeds it. The cost, accepted
+// deliberately, is 4 pairs who never share a flight: Bob+Weng, Daryl+Junyi,
+// Rainey+Song, Kai+Wilson.
+//
+// Day 3 has 7 players (Kai out), split 4 + 3.
 const DAILY_FLIGHTS = [
   { X:['Bob','Junyi','Rainey','Kai'], Y:['Weng','Daryl','Song','Wilson'] },
   { X:['Bob','Daryl','Song','Kai'], Y:['Weng','Rainey','Junyi','Wilson'] },
-  { X:['Bob','Weng','Wilson','Kai'], Y:['Daryl','Junyi','Rainey','Song'] },
+  { X:['Bob','Daryl','Rainey','Wilson'], Y:['Weng','Junyi','Song'] },
   { X:['Bob','Junyi','Song','Wilson'], Y:['Weng','Daryl','Rainey','Kai'] }
 ];
+
+// Players who aren't playing on a given day. They score nothing and are excluded
+// from that day's flights entirely.
+const ABSENT = { 2: ['Kai'] };
+function isAbsent(dayIdx, name){ return (ABSENT[dayIdx] || []).includes(name); }
 
 // Agreed side bets, applied on top of the scorecard.
 //
@@ -498,18 +516,90 @@ function sideBetsFor(dayIdx){
   return SIDE_BETS.filter(b => b.day === dayIdx);
 }
 
-function computeSixes(dayIdx, flightKey, nets){
-  const all = DAILY_FLIGHTS[dayIdx][flightKey];
-  const pair1 = all.slice(0,2);
-  const pair2 = all.slice(2,4);
-  const segments = [
-    { range:[0,5], label:'Holes 1–6', teams:[pair1.slice(), pair2.slice()] },
-    { range:[6,11], label:'Holes 7–12', teams:[[pair1[0],pair2[0]], [pair1[1],pair2[1]]] },
-    { range:[12,17], label:'Holes 13–18', teams:[[pair1[0],pair2[1]], [pair1[1],pair2[0]]] }
+// Shared by both formats. Ties share the slots they span, averaged.
+//
+// `anyPlayable` guards a real bug: with no scores entered nobody has won
+// anything, so every player ties and the average of [5,2,0,-2] hands each of
+// them +1.25 for a day that hasn't been played. Unplayed days now award nothing.
+function awardBonus(ranked, gamesWon, holesWonTotal, slots, anyPlayable){
+  const bonus = {};
+  if(!anyPlayable){ ranked.forEach(p=> bonus[p]=0); return bonus; }
+  let i = 0;
+  while(i < ranked.length){
+    let j = i;
+    while(j+1 < ranked.length
+          && gamesWon[ranked[j+1]] === gamesWon[ranked[i]]
+          && holesWonTotal[ranked[j+1]] === holesWonTotal[ranked[i]]) j++;
+    const span = slots.slice(i, j+1);
+    const avg = span.reduce((a,b)=>a+b,0) / span.length;
+    for(let k=i;k<=j;k++) bonus[ranked[k]] = avg;
+    i = j+1;
+  }
+  return bonus;
+}
+
+// 3-way individual match play, used when a flight is short a player.
+// Each hole goes to the outright lowest net (a tie for lowest gives nobody the
+// hole); most holes in a 6-hole segment wins that segment.
+function computeThreeWay(all, nets){
+  const gamesWon = {}, holesWonTotal = {};
+  all.forEach(p=>{ gamesWon[p]=0; holesWonTotal[p]=0; });
+  const segResults = [];
+  let anyPlayable = 0;
+  SEGMENTS.forEach(seg=>{
+    const won = {}; all.forEach(p=> won[p]=0);
+    let playable = 0;
+    for(let h=seg.range[0]; h<=seg.range[1]; h++){
+      const vals = all.map(p=> nets[p][h]);
+      if(vals.some(v=> v===null)) continue;
+      playable++;
+      const low = Math.min(...vals);
+      const leaders = all.filter((p,idx)=> vals[idx]===low);
+      if(leaders.length === 1) won[leaders[0]]++;   // shared low = halved hole
+    }
+    anyPlayable += playable;
+    all.forEach(p=> holesWonTotal[p] += won[p]);
+    const top = Math.max(...all.map(p=> won[p]));
+    const leaders = all.filter(p=> won[p]===top);
+    const winner = (playable>0 && leaders.length===1) ? leaders : null;
+    if(winner) gamesWon[winner[0]] += 1;
+    segResults.push({label:seg.label, teams:all.map(p=>[p]), threeWay:true,
+                     won, winner, playable});
+  });
+  const ranked = all.slice().sort((a,b)=> gamesWon[b]-gamesWon[a] || holesWonTotal[b]-holesWonTotal[a]);
+  const bonus = awardBonus(ranked, gamesWon, holesWonTotal, [5,2,-2], anyPlayable);
+  return {segResults, gamesWon, holesWonTotal, ranked, bonus, threeWay:true};
+}
+
+const SEGMENTS = [
+  { range:[0,5],   label:'Holes 1–6'   },
+  { range:[6,11],  label:'Holes 7–12'  },
+  { range:[12,17], label:'Holes 13–18' }
+];
+
+// Sixes for a normal 4-player flight: partners rotate every 6 holes so everyone
+// partners each flight-mate exactly once.
+function sixesSegments(all){
+  const p1 = all.slice(0,2), p2 = all.slice(2,4);
+  return [
+    { ...SEGMENTS[0], teams:[p1.slice(), p2.slice()] },
+    { ...SEGMENTS[1], teams:[[p1[0],p2[0]], [p1[1],p2[1]]] },
+    { ...SEGMENTS[2], teams:[[p1[0],p2[1]], [p1[1],p2[0]]] }
   ];
+}
+
+function computeSixes(dayIdx, flightKey, nets){
+  const all = DAILY_FLIGHTS[dayIdx][flightKey] || [];
+  // A 3-player flight (day 3, Kai out) can't play partners format, so it plays
+  // 3-way individual match play instead: lowest net takes the hole, most holes
+  // takes the 6-hole segment. Bonus slots differ because there are 3 places.
+  if(all.length === 3) return computeThreeWay(all, nets);
+
+  const segments = sixesSegments(all);
   const gamesWon = {}; const holesWonTotal = {};
   all.forEach(p=>{ gamesWon[p]=0; holesWonTotal[p]=0; });
   const segResults = [];
+  let anyPlayable = 0;
   segments.forEach(seg=>{
     let t1=0, t2=0, playable=0;
     for(let h=seg.range[0]; h<=seg.range[1]; h++){
@@ -522,6 +612,7 @@ function computeSixes(dayIdx, flightKey, nets){
       if(teamA<teamB) t1++;
       else if(teamB<teamA) t2++;
     }
+    anyPlayable += playable;
     let winner = null;
     if(t1>t2) winner = seg.teams[0];
     else if(t2>t1) winner = seg.teams[1];
@@ -531,17 +622,7 @@ function computeSixes(dayIdx, flightKey, nets){
     segResults.push({label:seg.label, teams:seg.teams, t1, t2, winner, playable});
   });
   const ranked = all.slice().sort((a,b)=> gamesWon[b]-gamesWon[a] || holesWonTotal[b]-holesWonTotal[a]);
-  const bonusSlots = [5,2,0,-2];
-  const bonus = {};
-  let i=0;
-  while(i<ranked.length){
-    let j=i;
-    while(j+1<ranked.length && gamesWon[ranked[j+1]]===gamesWon[ranked[i]] && holesWonTotal[ranked[j+1]]===holesWonTotal[ranked[i]]) j++;
-    const slots = bonusSlots.slice(i,j+1);
-    const avg = slots.reduce((a,b)=>a+b,0)/slots.length;
-    for(let k=i;k<=j;k++) bonus[ranked[k]] = avg;
-    i = j+1;
-  }
+  const bonus = awardBonus(ranked, gamesWon, holesWonTotal, [5,2,0,-2], anyPlayable);
   return {segResults, gamesWon, holesWonTotal, ranked, bonus};
 }
 
@@ -684,6 +765,14 @@ function sixesBlock(dayIdx, flightKey){
   const result = computeSixes(dayIdx, flightKey, nets);
   const label = flightKey==='X' ? 'Flight 1' : 'Flight 2';
   const segHtml = result.segResults.map(seg=>{
+    if(seg.threeWay){
+      const tally = Object.keys(seg.won).map(p=>`${p} ${seg.won[p]}`).join(' · ');
+      const winnerText = seg.winner ? `${seg.winner[0]} wins` : (seg.playable>0 ? 'Tied' : 'Awaiting scores');
+      return `<div class="segment">
+        <div><b>${Object.keys(seg.won).join(' vs ')}</b><br><span class="holes">${seg.label} — holes won: ${tally}</span></div>
+        <div class="winner">${winnerText}</div>
+      </div>`;
+    }
     const winnerText = seg.winner ? `${seg.winner[0]} + ${seg.winner[1]} win (${Math.max(seg.t1,seg.t2)}–${Math.min(seg.t1,seg.t2)})` : (seg.playable>0 ? 'Tied' : 'Awaiting scores');
     return `<div class="segment">
       <div><b>${seg.teams[0][0]} + ${seg.teams[0][1]}</b> vs <b>${seg.teams[1][0]} + ${seg.teams[1][1]}</b><br><span class="holes">${seg.label}</span></div>
@@ -697,7 +786,8 @@ function sixesBlock(dayIdx, flightKey){
   }).join('');
   return `
     <div class="sixes-section">
-      <h3>Sixes — ${label}</h3>
+      <h3>${result.threeWay ? '3-way match play' : 'Sixes'} — ${label}</h3>
+      ${result.threeWay ? `<div class="side-bet">Only 3 players in this flight, so partners format isn't possible. Each hole goes to the outright lowest net; most holes wins the 6-hole game. Bonus is +5 / +2 / −2.</div>` : ''}
       ${segHtml}
       <table class="rank-table">
         <thead><tr><th>#</th><th>Player</th><th>Games won</th><th>Holes won</th><th>Bonus</th></tr></thead>
@@ -766,6 +856,9 @@ function dayTotalsBlock(dayIdx){
   const bonusY = computeSixes(dayIdx,'Y',nets).bonus;
   const bonus = Object.assign({}, bonusX, bonusY);
   const rows = PLAYERS.map(p=>{
+    if(isAbsent(dayIdx, p.name)){
+      return `<div class="daytotal-row"><span>${p.name} <span style="opacity:0.6;font-size:11px;">(not playing)</span></span><span class="val" style="opacity:0.5;">0</span></div>`;
+    }
     const stableford = points[p.name].reduce((a,b)=>a+b,0);
     const filled = SCORES[dayIdx][p.name].filter(v=>v!=='').length;
     const b = bonus[p.name] || 0;
