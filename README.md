@@ -1,0 +1,80 @@
+# Brovisional Championship — Scorer
+
+A shared live scoreboard for a 4-day, 8-player golf trip in Phuket. Any player can enter scores
+from their own phone; everyone else's view updates within about a second.
+
+## Files
+
+| File | What it is |
+|---|---|
+| `phuket-golf-scorer.html` | The app: scoring logic, rendering, UI. |
+| `sync.js` | Local-first sync layer — outbox, merge rule, realtime. |
+| `supabase/schema.sql` | Tables, merge functions, RLS. Run once. |
+| `tests.html` | Offline tests for the sync logic. Open in a browser. |
+| `netlify.toml` | Static hosting config. |
+| `CLAUDE.md` | Context for a fresh Claude Code session. |
+| `docs/superpowers/specs/` | Design docs. |
+
+## Setup
+
+Two steps need your account credentials, so they're yours to do rather than mine.
+
+**1. Create the Supabase project and run the schema.**
+
+Sign in at [supabase.com](https://supabase.com) and create a free project. Open the SQL editor,
+paste the whole of `supabase/schema.sql`, and run it. Then go to Project Settings → API and copy
+the **Project URL** and the **anon public** key.
+
+Paste both into the top of `sync.js`:
+
+```js
+export const SUPABASE_CONFIG = {
+  url: 'https://xxxxxxxx.supabase.co',
+  anonKey: 'eyJhbGci...'
+};
+```
+
+Until those are filled in the app runs fine but stays local-only, and the status pill says so.
+
+**2. Deploy to Netlify.**
+
+Drag this folder onto [app.netlify.com/drop](https://app.netlify.com/drop) — no CLI, no account
+strictly required for a first look. For a URL that survives updates, connect the folder as a site
+in the Netlify dashboard instead.
+
+Then send the 8 players the URL.
+
+## How syncing works
+
+Scores are written to memory and `localStorage` first, then queued in an outbox that drains to
+Supabase whenever there's signal. A tap is never blocked on the network, which matters because
+course mobile data is patchy and entry happens out on the hole.
+
+Every write goes through a Postgres function whose `on conflict` clause rejects any update older
+than what's already stored. This is what stops a phone that spent 40 minutes in a dead zone from
+replaying its queue and overwriting newer scores. RLS grants `anon` select plus execute on those
+functions only — there is no direct insert or update path, so the merge rule is enforced by the
+database rather than trusted to the client.
+
+The status pill in the bottom-right shows `Live`, `Syncing… n`, or `Offline — n pending`.
+
+## Testing
+
+Open `tests.html` through a local web server (ES modules don't load over `file://`):
+
+```bash
+python3 -m http.server 4173
+```
+
+Then visit `http://localhost:4173/tests.html`. 23 tests, no framework, no install.
+
+## Known constraints
+
+- **The anon key is public.** Anyone with the site URL can read and write scores. This was a
+  deliberate tradeoff for 8 friends on an unlisted URL. If that changes, the fix is a passphrase
+  gate or Supabase anonymous auth.
+- **Last write wins across devices**, resolved by timestamp with a device-id tiebreak. Local
+  timestamps are strictly increasing, so a phone's clock jumping backwards can't make new edits
+  lose — but two phones with badly wrong clocks could still disagree about ordering.
+- **Player names are build-time constants.** They key the database rows and are referenced by
+  `DAILY_FLIGHTS`. Changing the roster means rebuilding the flight rotation — see `CLAUDE.md`.

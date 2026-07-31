@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brovisional Championship — Scorer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Space+Grotesk:wght@500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+:root{
+  --green-900:#0B3D2E;
+  --green-700:#155843;
+  --green-500:#1f6e54;
+  --cream:#F7F3E8;
+  --cream-2:#EFE9D8;
+  --gold:#C9A227;
+  --gold-dim:#e8d9a6;
+  --ink:#1F2A24;
+  --muted:#6b7268;
+  --line:#dcd4bb;
+  --red:#a3382e;
+  --white:#fff;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0;
+  background:var(--cream);
+  color:var(--ink);
+  font-family:'Space Grotesk', sans-serif;
+  padding-bottom:60px;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px;}
+header.hero{
+  background:var(--green-900);
+  color:var(--cream);
+  padding:28px 20px 22px;
+  margin-bottom:24px;
+}
+header.hero h1{
+  font-family:'Fraunces', serif;
+  font-weight:600;
+  font-size:28px;
+  margin:0 0 4px;
+  letter-spacing:0.2px;
+}
+header.hero p{
+  margin:0;
+  color:var(--gold-dim);
+  font-size:14px;
+}
+.setup{
+  background:var(--white);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:16px 18px;
+  margin-bottom:20px;
+}
+.setup h3{margin:0 0 12px;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);font-weight:600;}
+.hi-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+}
+.hi-card{
+  border:1px solid var(--line);
+  border-radius:8px;
+  padding:8px 10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.hi-card span{font-size:13px;font-weight:500;}
+.hi-card input{
+  width:56px;
+  font-family:'JetBrains Mono', monospace;
+  font-size:13px;
+  padding:4px 6px;
+  border:1px solid var(--line);
+  border-radius:6px;
+  text-align:right;
+}
+.tabs{
+  display:flex;
+  gap:4px;
+  margin-bottom:18px;
+  border-bottom:2px solid var(--line);
+  flex-wrap:wrap;
+}
+.tab-btn{
+  background:none;
+  border:none;
+  padding:10px 18px;
+  font-family:'Space Grotesk', sans-serif;
+  font-size:14px;
+  font-weight:500;
+  color:var(--muted);
+  cursor:pointer;
+  border-bottom:3px solid transparent;
+  margin-bottom:-2px;
+}
+.tab-btn.active{
+  color:var(--green-900);
+  border-bottom:3px solid var(--gold);
+}
+.day-panel{display:none;}
+.day-panel.active{display:block;}
+.course-info{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-bottom:14px;
+}
+.course-info h2{
+  font-family:'Fraunces', serif;
+  font-size:22px;
+  font-weight:600;
+  margin:0;
+  color:var(--green-900);
+}
+.course-info .meta{
+  font-family:'JetBrains Mono', monospace;
+  font-size:12px;
+  color:var(--muted);
+}
+.table-scroll{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--white);}
+table.score{
+  border-collapse:collapse;
+  width:100%;
+  font-family:'JetBrains Mono', monospace;
+  font-size:12px;
+  min-width:1100px;
+}
+table.score th, table.score td{
+  border-bottom:1px solid var(--line);
+  border-right:1px solid var(--line);
+  padding:4px 3px;
+  text-align:center;
+}
+table.score th{
+  background:var(--cream-2);
+  font-weight:500;
+  color:var(--muted);
+}
+table.score td.name{
+  text-align:left;
+  font-family:'Space Grotesk', sans-serif;
+  font-weight:500;
+  font-size:13px;
+  padding-left:10px;
+  min-width:90px;
+  background:var(--white);
+  position:sticky;
+  left:0;
+}
+table.score input.gross{
+  width:28px;
+  border:1px solid var(--line);
+  border-radius:4px;
+  text-align:center;
+  font-family:'JetBrains Mono', monospace;
+  font-size:12px;
+  padding:2px 0;
+}
+table.score td.par-row, table.score td.si-row{
+  color:var(--muted);
+  background:var(--cream-2);
+}
+.sixes-section{
+  background:var(--white);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:16px 18px;
+  margin-top:10px;
+}
+.sixes-section h3{
+  font-family:'Fraunces', serif;
+  font-size:17px;
+  margin:0 0 10px;
+  color:var(--green-900);
+}
+.segment{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:8px 0;
+  border-bottom:1px dashed var(--line);
+  font-size:13px;
+}
+.segment:last-child{border-bottom:none;}
+.segment .holes{color:var(--muted);font-family:'JetBrains Mono', monospace;font-size:11px;}
+.segment .winner{font-weight:600;color:var(--green-700);}
+.rank-table, .stroke-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px;}
+.rank-table th, .rank-table td, .stroke-table th, .stroke-table td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--line);}
+.rank-table th, .stroke-table th{color:var(--muted);font-weight:500;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;}
+.stroke-table td .holes-cell{font-family:'JetBrains Mono', monospace;font-size:12px;color:var(--green-700);}
+.stroke-table td.scratch{color:var(--muted);font-style:italic;}
+.bonus-pos{color:var(--green-700);font-weight:700;}
+.bonus-neg{color:var(--red);font-weight:700;}
+.bonus-zero{color:var(--muted);}
+.daytotal{
+  margin-top:14px;
+  background:var(--green-900);
+  color:var(--cream);
+  border-radius:10px;
+  padding:12px 16px;
+}
+.daytotal h4{margin:0 0 8px;font-family:'Fraunces',serif;font-size:15px;color:var(--gold-dim);font-weight:600;}
+.daytotal-row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.12);}
+.daytotal-row:last-child{border-bottom:none;}
+.daytotal-row .val{font-family:'JetBrains Mono', monospace;font-weight:700;}
+#leaderboard-panel table{width:100%;border-collapse:collapse;background:var(--white);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+#leaderboard-panel th, #leaderboard-panel td{padding:10px 12px;text-align:center;border-bottom:1px solid var(--line);font-family:'JetBrains Mono', monospace;font-size:13px;}
+#leaderboard-panel th{background:var(--cream-2);color:var(--muted);font-family:'Space Grotesk',sans-serif;font-weight:500;text-transform:uppercase;font-size:11px;letter-spacing:0.05em;}
+#leaderboard-panel td.pname{text-align:left;font-family:'Space Grotesk',sans-serif;font-weight:500;font-size:14px;}
+#leaderboard-panel td.total{font-weight:700;font-size:15px;color:var(--green-900);}
+#leaderboard-panel tr.leader td{background:#fbf3d9;}
+.note{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.5;}
+.save-status{position:fixed;bottom:14px;right:20px;font-size:11px;color:var(--muted);background:var(--white);border:1px solid var(--line);padding:5px 10px;border-radius:20px;opacity:0;transition:opacity 0.3s;}
+.save-status.show{opacity:1;}
+.save-status.warn{border-color:var(--gold);color:var(--green-900);font-weight:600;}
+
+.quick-entry{
+  background:var(--white);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:14px 16px 16px;
+  margin-bottom:16px;
+}
+.hole-nav-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:14px;
+  padding-bottom:12px;
+  border-bottom:1px solid var(--line);
+}
+.hole-nav{
+  background:var(--green-900);
+  color:var(--cream);
+  border:none;
+  border-radius:8px;
+  padding:10px 14px;
+  font-family:'Space Grotesk',sans-serif;
+  font-size:14px;
+  font-weight:500;
+  min-height:44px;
+}
+.hole-nav:disabled{opacity:0.35;}
+.hole-indicator{display:flex;flex-direction:column;align-items:center;gap:2px;}
+.hole-select{
+  font-family:'Fraunces',serif;
+  font-weight:600;
+  font-size:17px;
+  color:var(--green-900);
+  border:none;
+  background:none;
+  text-align:center;
+}
+.hole-meta{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);}
+.quick-player-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:8px 0;
+  border-bottom:1px solid var(--line);
+}
+.quick-player-row:last-child{border-bottom:none;}
+.qp-name{font-size:14px;font-weight:500;}
+.qp-ch{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-left:4px;}
+.stepper{display:flex;align-items:center;gap:6px;}
+.step-btn{
+  width:40px;
+  height:40px;
+  border-radius:8px;
+  border:1px solid var(--line);
+  background:var(--cream-2);
+  color:var(--green-900);
+  font-size:20px;
+  font-weight:600;
+  line-height:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.step-btn:active{background:var(--gold-dim);}
+input.qgross{
+  width:52px;
+  height:40px;
+  text-align:center;
+  border:1px solid var(--line);
+  border-radius:8px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:16px;
+  font-weight:700;
+}
+.full-table-details{margin-bottom:16px;}
+.full-table-details summary{
+  cursor:pointer;
+  font-size:13px;
+  font-weight:500;
+  color:var(--green-700);
+  padding:8px 0;
+  list-style:none;
+}
+.full-table-details summary::-webkit-details-marker{display:none;}
+.full-table-details summary::before{content:'▸ ';}
+.full-table-details[open] summary::before{content:'▾ ';}
+
+@media (max-width: 640px){
+  .wrap{padding:0 12px;}
+  header.hero{padding:20px 12px 16px;margin-bottom:16px;}
+  header.hero h1{font-size:21px;}
+  header.hero p{font-size:12px;}
+  .hi-grid{grid-template-columns:repeat(2,1fr);}
+  .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
+  .tab-btn{white-space:nowrap;padding:9px 12px;font-size:13px;}
+  table.score input.gross{width:34px;font-size:16px;padding:6px 0;}
+  table.score th, table.score td{padding:5px 2px;}
+  .sixes-section, .setup{padding:14px;}
+  .segment{flex-direction:column;align-items:flex-start;gap:4px;}
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>Brovisional Championship</h1>
+    <p>Net Stableford + Sixes bonus · flights reshuffle daily · one individual champion</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="setup">
+    <h3>Players &amp; handicap index</h3>
+    <div class="hi-grid" id="hi-grid"></div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <div id="panels"></div>
+
+  <div class="note">Course handicaps use White tee ratings (Loch Palm 68.2/115, par 71 — 2019 Jon Morrow redesign; Blue Canyon Canyon 70.4/131; Blue Canyon Lakes 69.3/124; Red Mountain 68.6/121). Flights reshuffle every day so everyone plays with everyone at least once over the trip. Strokes given between any two flight-mates equal the difference in their Course Handicap for that day, applied to the lowest stroke-index holes first.</div>
+</div>
+
+<div class="save-status" id="save-status">Saved</div>
+
+<script type="module">
+import { createSync } from './sync.js';
+
+let sync = null;
+
+const COURSES = [
+  { key:'day0', name:'Loch Palm Golf Course', rating:68.2, slope:115, par:71,
+    holes:[
+      {par:4,si:11},{par:5,si:1},{par:4,si:5},{par:3,si:15},{par:5,si:3},{par:4,si:7},{par:4,si:17},{par:3,si:13},{par:4,si:9},
+      {par:4,si:12},{par:3,si:14},{par:5,si:2},{par:4,si:8},{par:5,si:4},{par:3,si:16},{par:4,si:6},{par:3,si:10},{par:4,si:18}
+    ]},
+  { key:'day1', name:'Blue Canyon — Canyon Course', rating:70.4, slope:131, par:72,
+    holes:[
+      {par:4,si:16},{par:3,si:8},{par:4,si:2},{par:4,si:18},{par:4,si:4},{par:5,si:12},{par:3,si:6},{par:4,si:10},{par:5,si:14},
+      {par:4,si:11},{par:5,si:1},{par:4,si:5},{par:4,si:15},{par:3,si:13},{par:5,si:7},{par:4,si:17},{par:3,si:3},{par:4,si:9}
+    ]},
+  { key:'day2', name:'Blue Canyon — Lakes Course', rating:69.3, slope:124, par:72,
+    holes:[
+      {par:4,si:9},{par:3,si:13},{par:4,si:5},{par:4,si:1},{par:4,si:11},{par:4,si:15},{par:4,si:7},{par:3,si:17},{par:5,si:3},
+      {par:5,si:4},{par:4,si:14},{par:3,si:16},{par:5,si:10},{par:4,si:6},{par:5,si:8},{par:4,si:12},{par:3,si:18},{par:4,si:2}
+    ]},
+  { key:'day3', name:'Red Mountain Golf Course', rating:68.6, slope:121, par:72,
+    holes:[
+      {par:4,si:7},{par:5,si:5},{par:3,si:15},{par:5,si:11},{par:4,si:3},{par:4,si:1},{par:3,si:17},{par:4,si:13},{par:4,si:9},
+      {par:5,si:2},{par:3,si:18},{par:4,si:16},{par:3,si:14},{par:4,si:12},{par:5,si:10},{par:4,si:4},{par:4,si:8},{par:4,si:6}
+    ]}
+];
+
+let PLAYERS = [
+  {name:'Bob', hi:19},
+  {name:'Weng', hi:19},
+  {name:'Daryl', hi:21},
+  {name:'Junyi', hi:23.1},
+  {name:'Rainey', hi:24.1},
+  {name:'Kai', hi:28},
+  {name:'Song', hi:25},
+  {name:'Wilson', hi:25}
+];
+
+const DAILY_FLIGHTS = [
+  { X:['Bob','Junyi','Rainey','Kai'], Y:['Weng','Daryl','Song','Wilson'] },
+  { X:['Bob','Daryl','Song','Kai'], Y:['Weng','Junyi','Rainey','Wilson'] },
+  { X:['Bob','Weng','Wilson','Kai'], Y:['Daryl','Junyi','Rainey','Song'] },
+  { X:['Bob','Junyi','Song','Wilson'], Y:['Weng','Daryl','Rainey','Kai'] }
+];
+
+let SCORES = {};
+COURSES.forEach((c,d)=>{
+  SCORES[d] = {};
+  PLAYERS.forEach(p=>{ SCORES[d][p.name] = new Array(18).fill(''); });
+});
+
+let activeTab = 'day0';
+let currentHoleByDay = [0,0,0,0];
+let tableOpenByDay = [false,false,false,false];
+
+function courseHandicap(hi, course){
+  return Math.round(hi * course.slope/113 + (course.rating - course.par));
+}
+function strokesForHole(ch, si){
+  const base = Math.floor(ch/18);
+  const rem = ch - base*18;
+  return base + (si<=rem?1:0);
+}
+function ptsForNet(net, par){
+  const d = net - par;
+  if(d<=-3) return 5;
+  if(d===-2) return 4;
+  if(d===-1) return 3;
+  if(d===0) return 2;
+  if(d===1) return 1;
+  return 0;
+}
+
+function getPlayer(name){ return PLAYERS.find(p=>p.name===name); }
+
+function computeNets(dayIdx){
+  const course = COURSES[dayIdx];
+  const nets = {}; const points = {}; const ch = {};
+  PLAYERS.forEach(p=>{
+    ch[p.name] = courseHandicap(p.hi, course);
+    nets[p.name] = new Array(18).fill(null);
+    points[p.name] = new Array(18).fill(0);
+    for(let h=0; h<18; h++){
+      const raw = SCORES[dayIdx][p.name][h];
+      if(raw === '' || raw === null || raw === undefined) continue;
+      const gross = parseInt(raw,10);
+      if(isNaN(gross)) continue;
+      const strokes = strokesForHole(ch[p.name], course.holes[h].si);
+      const net = gross - strokes;
+      nets[p.name][h] = net;
+      points[p.name][h] = ptsForNet(net, course.holes[h].par);
+    }
+  });
+  return {ch, nets, points};
+}
+
+function computeSixes(dayIdx, flightKey, nets){
+  const all = DAILY_FLIGHTS[dayIdx][flightKey];
+  const pair1 = all.slice(0,2);
+  const pair2 = all.slice(2,4);
+  const segments = [
+    { range:[0,5], label:'Holes 1–6', teams:[pair1.slice(), pair2.slice()] },
+    { range:[6,11], label:'Holes 7–12', teams:[[pair1[0],pair2[0]], [pair1[1],pair2[1]]] },
+    { range:[12,17], label:'Holes 13–18', teams:[[pair1[0],pair2[1]], [pair1[1],pair2[0]]] }
+  ];
+  const gamesWon = {}; const holesWonTotal = {};
+  all.forEach(p=>{ gamesWon[p]=0; holesWonTotal[p]=0; });
+  const segResults = [];
+  segments.forEach(seg=>{
+    let t1=0, t2=0, playable=0;
+    for(let h=seg.range[0]; h<=seg.range[1]; h++){
+      const a1=nets[seg.teams[0][0]][h], a2=nets[seg.teams[0][1]][h];
+      const b1=nets[seg.teams[1][0]][h], b2=nets[seg.teams[1][1]][h];
+      if(a1===null||a2===null||b1===null||b2===null) continue;
+      playable++;
+      const teamA = Math.min(a1,a2);
+      const teamB = Math.min(b1,b2);
+      if(teamA<teamB) t1++;
+      else if(teamB<teamA) t2++;
+    }
+    let winner = null;
+    if(t1>t2) winner = seg.teams[0];
+    else if(t2>t1) winner = seg.teams[1];
+    seg.teams[0].forEach(p=>holesWonTotal[p]+=t1);
+    seg.teams[1].forEach(p=>holesWonTotal[p]+=t2);
+    if(winner) winner.forEach(p=>gamesWon[p]+=1);
+    segResults.push({label:seg.label, teams:seg.teams, t1, t2, winner, playable});
+  });
+  const ranked = all.slice().sort((a,b)=> gamesWon[b]-gamesWon[a] || holesWonTotal[b]-holesWonTotal[a]);
+  const bonusSlots = [5,2,0,-2];
+  const bonus = {};
+  let i=0;
+  while(i<ranked.length){
+    let j=i;
+    while(j+1<ranked.length && gamesWon[ranked[j+1]]===gamesWon[ranked[i]] && holesWonTotal[ranked[j+1]]===holesWonTotal[ranked[i]]) j++;
+    const slots = bonusSlots.slice(i,j+1);
+    const avg = slots.reduce((a,b)=>a+b,0)/slots.length;
+    for(let k=i;k<=j;k++) bonus[ranked[k]] = avg;
+    i = j+1;
+  }
+  return {segResults, gamesWon, holesWonTotal, ranked, bonus};
+}
+
+function strokesGivenRows(dayIdx, flightKey, ch){
+  const course = COURSES[dayIdx];
+  const players = DAILY_FLIGHTS[dayIdx][flightKey];
+  const rows = [];
+  for(let i=0;i<players.length;i++){
+    for(let j=i+1;j<players.length;j++){
+      const a = players[i], b = players[j];
+      const chA = ch[a], chB = ch[b];
+      if(chA===chB){
+        rows.push({a,b,diff:0,giver:null,receiver:null,holes:[]});
+        continue;
+      }
+      const giver = chA < chB ? a : b;
+      const receiver = chA < chB ? b : a;
+      const diff = Math.abs(chA-chB);
+      const holes = course.holes
+        .map((h,idx)=>({hole:idx+1, si:h.si}))
+        .filter(h=>h.si<=diff)
+        .map(h=>h.hole);
+      rows.push({a,b,diff,giver,receiver,holes});
+    }
+  }
+  return rows;
+}
+
+function strokesGivenTable(dayIdx, flightKey){
+  const {ch} = computeNets(dayIdx);
+  const rows = strokesGivenRows(dayIdx, flightKey, ch);
+  const body = rows.map(r=>{
+    if(r.diff===0){
+      return '<tr><td>'+r.a+' vs '+r.b+'</td><td class="scratch">Same course handicap — no strokes between them</td></tr>';
+    }
+    const holesText = r.holes.map(h=>'H'+h).join(', ');
+    return '<tr><td>'+r.giver+' → '+r.receiver+'</td><td>'+r.diff+' stroke'+(r.diff>1?'s':'')+' on <span class="holes-cell">'+holesText+'</span></td></tr>';
+  }).join('');
+  return '<table class="stroke-table"><thead><tr><th>Pair</th><th>Strokes given</th></tr></thead><tbody>'+body+'</tbody></table>';
+}
+
+function adjustScore(day, name, hole, delta){
+  const course = COURSES[day];
+  const cur = SCORES[day][name][hole];
+  const par = course.holes[hole].par;
+  let val = (cur==='' || cur===null || cur===undefined) ? par : parseInt(cur,10);
+  if(isNaN(val)) val = par;
+  val += delta;
+  if(val<1) val=1;
+  if(val>15) val=15;
+  SCORES[day][name][hole] = String(val);
+}
+
+function quickEntryBlock(dayIdx){
+  const course = COURSES[dayIdx];
+  const h = currentHoleByDay[dayIdx];
+  const holeInfo = course.holes[h];
+  const {ch} = computeNets(dayIdx);
+  function playerRow(name){
+    const val = SCORES[dayIdx][name][h];
+    return `<div class="quick-player-row">
+      <span class="qp-name">${name}<span class="qp-ch">CH ${ch[name]}</span></span>
+      <div class="stepper">
+        <button type="button" class="step-btn" data-action="dec" data-day="${dayIdx}" data-player="${name}" data-hole="${h}">−</button>
+        <input class="gross qgross" type="number" min="1" max="15" data-day="${dayIdx}" data-player="${name}" data-hole="${h}" value="${val}">
+        <button type="button" class="step-btn" data-action="inc" data-day="${dayIdx}" data-player="${name}" data-hole="${h}">+</button>
+      </div>
+    </div>`;
+  }
+  const options = course.holes.map((hh,i)=>`<option value="${i}" ${i===h?'selected':''}>Hole ${i+1}</option>`).join('');
+  return `
+    <div class="quick-entry">
+      <div class="hole-nav-row">
+        <button type="button" class="hole-nav" data-dir="-1" data-day="${dayIdx}" ${h===0?'disabled':''}>‹ Prev</button>
+        <div class="hole-indicator">
+          <select class="hole-select" data-day="${dayIdx}">${options}</select>
+          <span class="hole-meta">Par ${holeInfo.par} · SI ${holeInfo.si}</span>
+        </div>
+        <button type="button" class="hole-nav" data-dir="1" data-day="${dayIdx}" ${h===17?'disabled':''}>Next ›</button>
+      </div>
+      <div class="flight-label X">Flight 1</div>
+      ${DAILY_FLIGHTS[dayIdx].X.map(playerRow).join('')}
+      <div class="flight-label Y" style="margin-top:10px;">Flight 2</div>
+      ${DAILY_FLIGHTS[dayIdx].Y.map(playerRow).join('')}
+    </div>
+  `;
+}
+
+function renderHiGrid(){
+  const grid = document.getElementById('hi-grid');
+  grid.innerHTML = PLAYERS.map(p=>`
+    <div class="hi-card">
+      <span>${p.name}</span>
+      <input type="number" step="0.1" class="hi-input" data-player="${p.name}" value="${p.hi}">
+    </div>
+  `).join('');
+}
+
+function renderTabs(){
+  const tabs = document.getElementById('tabs');
+  const labels = COURSES.map((c,i)=>`Day ${i+1}`);
+  tabs.innerHTML = labels.map((l,i)=>`<button class="tab-btn ${activeTab==='day'+i?'active':''}" data-tab="day${i}">${l}</button>`).join('')
+    + `<button class="tab-btn ${activeTab==='leaderboard'?'active':''}" data-tab="leaderboard">Leaderboard</button>`;
+}
+
+function scoreTable(dayIdx){
+  const course = COURSES[dayIdx];
+  const {ch} = computeNets(dayIdx);
+  function flightRows(flightKey){
+    return DAILY_FLIGHTS[dayIdx][flightKey].map(name=>{
+      const scores = SCORES[dayIdx][name];
+      const cells = scores.map((v,h)=>`<td><input class="gross" type="number" min="1" max="15" data-day="${dayIdx}" data-player="${name}" data-hole="${h}" value="${v}"></td>`).join('');
+      return `<tr><td class="name">${name} <span style="color:var(--muted);font-weight:400;">(CH ${ch[name]})</span></td>${cells}</tr>`;
+    }).join('');
+  }
+  const parRow = course.holes.map(h=>`<td class="par-row">${h.par}</td>`).join('');
+  const siRow = course.holes.map(h=>`<td class="si-row">${h.si}</td>`).join('');
+  const headHoles = course.holes.map((h,i)=>`<th>${i+1}</th>`).join('');
+  return `
+  <div class="table-scroll">
+  <table class="score">
+    <thead>
+      <tr><th class="name" style="position:sticky;left:0;">Hole</th>${headHoles}</tr>
+      <tr><td class="name par-row" style="position:sticky;left:0;">Par</td>${parRow}</tr>
+      <tr><td class="name si-row" style="position:sticky;left:0;">SI</td>${siRow}</tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="19" style="text-align:left;background:var(--green-700);color:var(--cream);font-weight:600;">Flight 1: ${DAILY_FLIGHTS[dayIdx].X.join(', ')}</td></tr>
+      ${flightRows('X')}
+      <tr><td colspan="19" style="text-align:left;background:var(--gold);color:var(--green-900);font-weight:600;">Flight 2: ${DAILY_FLIGHTS[dayIdx].Y.join(', ')}</td></tr>
+      ${flightRows('Y')}
+    </tbody>
+  </table>
+  </div>`;
+}
+
+function sixesBlock(dayIdx, flightKey){
+  const {nets} = computeNets(dayIdx);
+  const result = computeSixes(dayIdx, flightKey, nets);
+  const label = flightKey==='X' ? 'Flight 1' : 'Flight 2';
+  const segHtml = result.segResults.map(seg=>{
+    const winnerText = seg.winner ? `${seg.winner[0]} + ${seg.winner[1]} win (${Math.max(seg.t1,seg.t2)}–${Math.min(seg.t1,seg.t2)})` : (seg.playable>0 ? 'Tied' : 'Awaiting scores');
+    return `<div class="segment">
+      <div><b>${seg.teams[0][0]} + ${seg.teams[0][1]}</b> vs <b>${seg.teams[1][0]} + ${seg.teams[1][1]}</b><br><span class="holes">${seg.label}</span></div>
+      <div class="winner">${winnerText}</div>
+    </div>`;
+  }).join('');
+  const rankRows = result.ranked.map((name,i)=>{
+    const b = result.bonus[name];
+    const bc = b>0 ? 'bonus-pos' : (b<0 ? 'bonus-neg' : 'bonus-zero');
+    return `<tr><td>${i+1}</td><td>${name}</td><td>${result.gamesWon[name]}</td><td>${result.holesWonTotal[name]}</td><td class="${bc}">${b>0?'+':''}${b}</td></tr>`;
+  }).join('');
+  return `
+    <div class="sixes-section">
+      <h3>Sixes — ${label}</h3>
+      ${segHtml}
+      <table class="rank-table">
+        <thead><tr><th>#</th><th>Player</th><th>Games won</th><th>Holes won</th><th>Bonus</th></tr></thead>
+        <tbody>${rankRows}</tbody>
+      </table>
+      <h3 style="margin-top:16px;">Strokes given — ${label}</h3>
+      ${strokesGivenTable(dayIdx, flightKey)}
+    </div>
+  `;
+}
+
+function dayTotalsBlock(dayIdx){
+  const {points, nets} = computeNets(dayIdx);
+  const bonusX = computeSixes(dayIdx,'X',nets).bonus;
+  const bonusY = computeSixes(dayIdx,'Y',nets).bonus;
+  const bonus = Object.assign({}, bonusX, bonusY);
+  const rows = PLAYERS.map(p=>{
+    const stableford = points[p.name].reduce((a,b)=>a+b,0);
+    const filled = SCORES[dayIdx][p.name].filter(v=>v!=='').length;
+    const b = bonus[p.name] || 0;
+    const total = stableford + b;
+    return `<div class="daytotal-row"><span>${p.name} ${filled<18?`<span style="opacity:0.6;font-size:11px;">(${filled}/18 holes)</span>`:''}</span><span class="val">${stableford} + ${b>0?'+':''}${b} = ${total}</span></div>`;
+  }).join('');
+  return `<div class="daytotal"><h4>Day score = Net Stableford + Sixes bonus</h4>${rows}</div>`;
+}
+
+function renderDayPanel(dayIdx){
+  const course = COURSES[dayIdx];
+  return `
+    <div class="course-info">
+      <h2>${course.name}</h2>
+      <div class="meta">Par ${course.par} · Rating ${course.rating} · Slope ${course.slope} (White tees)</div>
+    </div>
+    ${quickEntryBlock(dayIdx)}
+    <details class="full-table-details" data-day="${dayIdx}" ${tableOpenByDay[dayIdx]?'open':''}>
+      <summary>Full scorecard (all 18 holes)</summary>
+      ${scoreTable(dayIdx)}
+    </details>
+    ${sixesBlock(dayIdx,'X')}
+    ${sixesBlock(dayIdx,'Y')}
+    ${dayTotalsBlock(dayIdx)}
+  `;
+}
+
+function renderLeaderboard(){
+  const totals = {};
+  PLAYERS.forEach(p=> totals[p.name] = {days:[], grand:0});
+  COURSES.forEach((c,dayIdx)=>{
+    const {points, nets} = computeNets(dayIdx);
+    const bonusX = computeSixes(dayIdx,'X',nets).bonus;
+    const bonusY = computeSixes(dayIdx,'Y',nets).bonus;
+    const bonus = Object.assign({}, bonusX, bonusY);
+    PLAYERS.forEach(p=>{
+      const stableford = points[p.name].reduce((a,b)=>a+b,0);
+      const b = bonus[p.name] || 0;
+      const dayTotal = stableford + b;
+      totals[p.name].days.push(dayTotal);
+      totals[p.name].grand += dayTotal;
+    });
+  });
+  const ranked = PLAYERS.slice().sort((a,b)=> totals[b.name].grand - totals[a.name].grand);
+  const rows = ranked.map((p,i)=>{
+    const t = totals[p.name];
+    return `<tr class="${i===0?'leader':''}"><td>${i+1}</td><td class="pname">${p.name}</td>${t.days.map(d=>`<td>${Math.round(d*10)/10}</td>`).join('')}<td class="total">${Math.round(t.grand*10)/10}</td></tr>`;
+  }).join('');
+  return `<div id="leaderboard-panel">
+    <table>
+      <thead><tr><th>#</th><th style="text-align:left;">Player</th><th>Day 1</th><th>Day 2</th><th>Day 3</th><th>Day 4</th><th>Total</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function renderPanels(){
+  const panels = document.getElementById('panels');
+  let html = '';
+  COURSES.forEach((c,i)=>{
+    html += `<div class="day-panel ${activeTab==='day'+i?'active':''}" id="panel-day${i}">${renderDayPanel(i)}</div>`;
+  });
+  html += `<div class="day-panel ${activeTab==='leaderboard'?'active':''}" id="panel-leaderboard">${renderLeaderboard()}</div>`;
+  panels.innerHTML = html;
+}
+
+function renderAll(){
+  renderHiGrid();
+  renderTabs();
+  renderPanels();
+}
+
+// Persistence and sharing live in sync.js. Scores are written locally first and
+// queued for Supabase, so entry works with no signal out on the course.
+
+function showStatus(text){
+  const el = document.getElementById('save-status');
+  el.textContent = text;
+  el.classList.add('show');
+  el.classList.toggle('warn', /Offline/.test(text));
+}
+
+// Re-render after a change arrives from someone else's phone, without yanking
+// the field the player is currently typing in.
+function renderRemote(){
+  const el = document.activeElement;
+  const inGross = el && el.classList && el.classList.contains('gross');
+  const inHi    = el && el.classList && el.classList.contains('hi-input');
+
+  if(inGross){
+    refreshCurrentDayKeepFocus(el.getAttribute('data-day'), el.getAttribute('data-player'),
+                               parseInt(el.getAttribute('data-hole'), 10));
+  }else{
+    refreshCurrentDay();
+  }
+  if(!inHi) renderHiGrid();
+  if(activeTab === 'leaderboard'){
+    document.getElementById('panel-leaderboard').innerHTML = renderLeaderboard();
+  }
+}
+
+document.addEventListener('click', (e)=>{
+  const tabBtn = e.target.closest('.tab-btn');
+  if(tabBtn){
+    activeTab = tabBtn.getAttribute('data-tab');
+    renderTabs();
+    document.querySelectorAll('.day-panel').forEach(p=>p.classList.remove('active'));
+    const target = activeTab==='leaderboard' ? document.getElementById('panel-leaderboard') : document.getElementById('panel-'+activeTab);
+    if(target) target.classList.add('active');
+    if(activeTab==='leaderboard'){
+      document.getElementById('panel-leaderboard').innerHTML = renderLeaderboard();
+    }
+    return;
+  }
+
+  const stepBtn = e.target.closest('.step-btn');
+  if(stepBtn){
+    const day = stepBtn.getAttribute('data-day');
+    const name = stepBtn.getAttribute('data-player');
+    const hole = parseInt(stepBtn.getAttribute('data-hole'),10);
+    const delta = stepBtn.getAttribute('data-action')==='inc' ? 1 : -1;
+    adjustScore(day, name, hole, delta);
+    refreshCurrentDay();
+    sync.recordScore(day, name, hole, SCORES[day][name][hole]);
+    return;
+  }
+
+  const navBtn = e.target.closest('.hole-nav');
+  if(navBtn){
+    const day = parseInt(navBtn.getAttribute('data-day'),10);
+    const dir = parseInt(navBtn.getAttribute('data-dir'),10);
+    currentHoleByDay[day] = Math.min(17, Math.max(0, currentHoleByDay[day]+dir));
+    refreshCurrentDay();
+    return;
+  }
+});
+
+document.addEventListener('toggle', (e)=>{
+  if(e.target.classList && e.target.classList.contains('full-table-details')){
+    const day = parseInt(e.target.getAttribute('data-day'),10);
+    tableOpenByDay[day] = e.target.open;
+  }
+}, true);
+
+document.addEventListener('change', (e)=>{
+  if(e.target.classList.contains('hole-select')){
+    const day = parseInt(e.target.getAttribute('data-day'),10);
+    currentHoleByDay[day] = parseInt(e.target.value,10);
+    refreshCurrentDay();
+  }
+});
+
+document.addEventListener('input', (e)=>{
+  if(e.target.classList.contains('hi-input')){
+    const name = e.target.getAttribute('data-player');
+    const p = getPlayer(name);
+    const val = parseFloat(e.target.value);
+    if(!isNaN(val)){ p.hi = val; sync.recordPlayer(name, val); }
+    refreshCurrentDay();
+  }
+  if(e.target.classList.contains('gross')){
+    const day = e.target.getAttribute('data-day');
+    const name = e.target.getAttribute('data-player');
+    const hole = parseInt(e.target.getAttribute('data-hole'),10);
+    SCORES[day][name][hole] = e.target.value;
+    refreshCurrentDayKeepFocus(day, name, hole);
+    sync.recordScore(day, name, hole, e.target.value);
+  }
+});
+
+function refreshCurrentDay(){
+  if(activeTab.startsWith('day')){
+    const idx = parseInt(activeTab.replace('day',''),10);
+    document.getElementById('panel-'+activeTab).innerHTML = renderDayPanel(idx);
+  }
+}
+
+function refreshCurrentDayKeepFocus(dayIdx, playerName, holeIdx){
+  const idx = parseInt(dayIdx,10);
+  document.getElementById('panel-day'+idx).innerHTML = renderDayPanel(idx);
+  const sel = document.querySelector('.gross[data-day="'+dayIdx+'"][data-player="'+playerName+'"][data-hole="'+holeIdx+'"]');
+  if(sel){ sel.focus(); const v=sel.value; sel.value=''; sel.value=v; }
+}
+
+(function init(){
+  sync = createSync({ SCORES, PLAYERS, onRemoteChange: renderRemote, onStatus: showStatus });
+  sync.hydrate();   // instant, from localStorage — the app opens fine with no signal
+  renderAll();
+  sync.start();     // then pull and subscribe in the background
+})();
+</script>
+</body>
+</html>

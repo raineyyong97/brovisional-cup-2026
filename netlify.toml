@@ -1,0 +1,21 @@
+[build]
+  publish = "."
+
+# Players should get the scorer from the bare URL, not have to type a filename.
+[[redirects]]
+  from = "/"
+  to = "/phuket-golf-scorer.html"
+  status = 200
+
+# The test page is dev-only; keep it off the deployed site.
+[[redirects]]
+  from = "/tests.html"
+  to = "/phuket-golf-scorer.html"
+  status = 302
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"
