@@ -31,25 +31,17 @@ Sign in at [supabase.com](https://supabase.com) and create a free project. Open 
 paste the whole of `supabase/schema.sql`, and run it. Then go to Project Settings → API and copy
 the **Project URL** and the **anon public** key.
 
-Paste both into the top of `sync.js`:
-
-```js
-export const SUPABASE_CONFIG = {
-  url: 'https://xxxxxxxx.supabase.co',
-  anonKey: 'eyJhbGci...'
-};
-```
-
-Until those are filled in the app runs fine but stays local-only, and the status pill says so.
-
-**2. Push, and it's live.**
+**2. Run one command with those two values.**
 
 ```bash
-git add sync.js && git commit -m "Add Supabase credentials" && git push
+./configure-sync.sh <project-url> <anon-key>
 ```
 
-GitHub Pages rebuilds in about a minute. Confirm the status pill reads `Live` rather than
-`Local only — not synced`, then send the 8 players the URL.
+It checks the credentials work and the schema actually ran, writes them into `sync.js`, commits,
+pushes, waits for Pages to rebuild, and confirms the live site picked them up. If you forgot to
+run the SQL, it tells you that instead of shipping a broken site.
+
+Then send the 8 players the URL and confirm the pill reads `Live`.
 
 `netlify.toml` is kept in case the group would rather host there later; it isn't used by Pages.
 
