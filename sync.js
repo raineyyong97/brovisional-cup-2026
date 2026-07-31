@@ -11,8 +11,8 @@
 // with no network.
 
 export const SUPABASE_CONFIG = {
-  url: '',      // e.g. 'https://abcdefgh.supabase.co'
-  anonKey: ''   // the public anon key
+  url: 'https://awkvztyhalfakwlhitft.supabase.co',
+  anonKey: 'sb_publishable_rIBtcMUO_yvbuzClgMWWVg_OXqh-vTt'
 };
 
 const CLIENT_URL = 'https://esm.sh/@supabase/supabase-js@2';
