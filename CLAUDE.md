@@ -78,6 +78,35 @@ If a player list changes (someone drops out, someone new joins), this rotation n
 manually rebuilt, not just patched — it's an interlocking schedule, not independent daily
 lists.
 
+### Order within a flight is meaningful
+
+`computeSixes` derives the entire partner rotation from the array order: the first two names are
+the opening pair, and the other two segments are generated from there. So reordering a flight
+changes who partners whom in each 6-hole segment, while leaving flight membership and the
+handicap balance alone.
+
+Day 2 Flight 2 is ordered `Weng, Rainey, Junyi, Wilson` because the group actually played
+Weng+Rainey over holes 1–6, not Weng+Junyi. Everyone still partners each flight-mate exactly
+once. If another day's opening pair turns out to be misrecorded, the fix is a reorder of that
+flight — not a change to `computeSixes`.
+
+## Side bets
+
+`SIDE_BETS` holds agreed adjustments applied on top of the scorecard. Currently one: Bob and
+Rainey exchange holes 1–15 on Day 1.
+
+The exchange is done on **net scores**, not on Stableford points. Both players play the same hole
+with the same par, so swapping nets swaps the Stableford points identically — and because Sixes
+is played on nets, the match play follows from the same swap. Adjusting points alone would leave
+the leaderboard disagreeing with the Sixes result over the same holes. Note this does change who
+won those Sixes segments, which is intended: Bob and Rainey share a flight on Day 1.
+
+`applySideBets` is called inside `computeNets` on purpose. The Sixes block, the day totals, and
+the leaderboard all read from `computeNets`, so one insertion point keeps every view consistent
+instead of each recomputing the adjustment. `holes` is an inclusive 0-indexed range — `[0,14]`
+is holes 1–15. Each active bet renders a gold note at the top of its day panel; don't make an
+adjustment silent.
+
 ## Shared state (solved — see `sync.js`)
 
 This was the project's main open problem and is now built. Design doc:

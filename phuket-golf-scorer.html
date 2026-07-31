@@ -221,6 +221,8 @@ table.score td.par-row, table.score td.si-row{
 .save-status{position:fixed;bottom:14px;right:20px;font-size:11px;color:var(--muted);background:var(--white);border:1px solid var(--line);padding:5px 10px;border-radius:20px;opacity:0;transition:opacity 0.3s;}
 .save-status.show{opacity:1;}
 .save-status.warn{border-color:var(--gold);color:var(--green-900);font-weight:600;}
+.side-bet{margin:12px 0;padding:9px 13px;border-left:3px solid var(--gold);background:rgba(201,162,39,0.09);
+          border-radius:0 6px 6px 0;font-size:12px;line-height:1.5;color:var(--green-900);}
 
 .quick-entry{
   background:var(--white);
@@ -390,11 +392,33 @@ let PLAYERS = [
   {name:'Wilson', hi:25}
 ];
 
+// Order within a flight is NOT cosmetic — computeSixes derives the whole partner
+// rotation from it (first two are the opening pair). Flight membership and the
+// handicap balance are the designed part; the ordering just records who actually
+// teed off with whom.
+//
+// Day 2 Flight 2 is ordered Weng/Rainey/Junyi/Wilson because the group played
+// Weng+Rainey in holes 1–6, not Weng+Junyi. Everyone still partners each
+// flight-mate exactly once.
 const DAILY_FLIGHTS = [
   { X:['Bob','Junyi','Rainey','Kai'], Y:['Weng','Daryl','Song','Wilson'] },
-  { X:['Bob','Daryl','Song','Kai'], Y:['Weng','Junyi','Rainey','Wilson'] },
+  { X:['Bob','Daryl','Song','Kai'], Y:['Weng','Rainey','Junyi','Wilson'] },
   { X:['Bob','Weng','Wilson','Kai'], Y:['Daryl','Junyi','Rainey','Song'] },
   { X:['Bob','Junyi','Song','Wilson'], Y:['Weng','Daryl','Rainey','Kai'] }
+];
+
+// Agreed side bets, applied on top of the scorecard.
+//
+// The exchange is done on NET SCORES rather than on Stableford points. Both
+// players play the same hole with the same par, so swapping nets swaps the
+// Stableford points identically — and because Sixes is played on nets, the match
+// play follows from the same swap. Adjusting points alone would leave the
+// leaderboard disagreeing with the Sixes result on the same holes.
+//
+// `holes` is an inclusive 0-indexed range: [0,14] is holes 1–15.
+const SIDE_BETS = [
+  { day:0, a:'Bob', b:'Rainey', holes:[0,14],
+    label:'Side bet — Bob ⇄ Rainey exchange holes 1–15' }
 ];
 
 let SCORES = {};
@@ -445,7 +469,25 @@ function computeNets(dayIdx){
       points[p.name][h] = ptsForNet(net, course.holes[h].par);
     }
   });
+  applySideBets(dayIdx, nets, points);
   return {ch, nets, points};
+}
+
+// Applied here, inside computeNets, on purpose: the Sixes block, the day totals,
+// and the leaderboard all read from computeNets, so one insertion point keeps
+// every view consistent rather than each recomputing the adjustment itself.
+function applySideBets(dayIdx, nets, points){
+  SIDE_BETS.filter(b => b.day === dayIdx).forEach(bet => {
+    if(!nets[bet.a] || !nets[bet.b]) return;
+    for(let h = bet.holes[0]; h <= bet.holes[1]; h++){
+      [nets[bet.a][h],   nets[bet.b][h]]   = [nets[bet.b][h],   nets[bet.a][h]];
+      [points[bet.a][h], points[bet.b][h]] = [points[bet.b][h], points[bet.a][h]];
+    }
+  });
+}
+
+function sideBetsFor(dayIdx){
+  return SIDE_BETS.filter(b => b.day === dayIdx);
 }
 
 function computeSixes(dayIdx, flightKey, nets){
@@ -680,6 +722,7 @@ function renderDayPanel(dayIdx){
       <h2>${course.name}</h2>
       <div class="meta">Par ${course.par} · Rating ${course.rating} · Slope ${course.slope} (White tees)</div>
     </div>
+    ${sideBetsFor(dayIdx).map(b=>`<div class="side-bet">${b.label} — their net scores on those holes are exchanged, so this affects both Stableford and Sixes.</div>`).join('')}
     ${quickEntryBlock(dayIdx)}
     <details class="full-table-details" data-day="${dayIdx}" ${tableOpenByDay[dayIdx]?'open':''}>
       <summary>Full scorecard (all 18 holes)</summary>
