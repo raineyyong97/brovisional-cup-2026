@@ -58,11 +58,14 @@ be corrected once a layout change came to light — so treat all four course dat
 If anyone in the group can get an actual current scorecard photo from the pro shop for any of
 the 4 courses, that should be treated as authoritative over what's currently in `COURSES`.
 
-Current data as of this handoff:
-- **Loch Palm Golf Course** — par 71, White 68.2/115 (2019 Jon Morrow redesign)
-- **Blue Canyon — Canyon Course** — par 72, White 70.4/131
-- **Blue Canyon — Lakes Course** — par 72, White 69.3/124
-- **Red Mountain Golf Course** — par 72, White 68.6/121
+Play order (days 3 and 4 were swapped from the original plan — the group plays Red Mountain on
+day 3 and Blue Canyon Lakes on day 4). Only `COURSES` moved; `DAILY_FLIGHTS` is tied to the day,
+not the venue, so groupings stayed put.
+
+- **Day 1 — Loch Palm Golf Course** — par 71, White 68.2/115 (2019 Jon Morrow redesign)
+- **Day 2 — Blue Canyon — Canyon Course** — par 72, White 70.4/131
+- **Day 3 — Red Mountain Golf Course** — par 72, White 68.6/121
+- **Day 4 — Blue Canyon — Lakes Course** — par 72, White 69.3/124
 
 ## Flight rotation logic
 
@@ -173,10 +176,53 @@ that changes, add a passphrase gate or Supabase anonymous auth.
 - The `DAILY_FLIGHTS` rotation — see "Flight rotation logic" above, it's a designed schedule,
   not arbitrary.
 
+## Gross strokes summary
+
+`grossFor(dayIdx)` totals raw strokes before handicap. Rendered twice: `grossBlock` on each day
+panel, and `renderGrossSummary` on the leaderboard.
+
+Two properties worth preserving:
+
+- **Score to par is measured against the holes actually played**, not the full course. Otherwise
+  40 strokes through 9 holes reads as −31 instead of +4, which is worse than showing nothing.
+- **Gross is deliberately unaffected by `SIDE_BETS`.** Those exchange net scores; gross is what a
+  player physically hit, and "how everyone's shooting" should stay a record of ball-striking.
+
+It lives in its own table because it ranks low-to-high while the championship ranks high-to-low.
+Don't merge them — opposite-direction numbers in one grid invite misreading the leaderboard.
+`byGross` sorts players with no scores to the bottom, so nobody leads on zero strokes.
+
+## Handicaps are admin-managed
+
+Players cannot change handicap indexes. Three layers, only the last of which is real:
+
+1. The HI inputs render `disabled`.
+2. There is no `hi-input` branch in the `input` handler and no `recordPlayer` in `sync.js`.
+3. **`execute` on `upsert_player` is revoked from `anon`** — this is the actual enforcement.
+
+Layers 1 and 2 are cosmetic on their own: the source and the API key are public, so a disabled
+input stops accidents, not intent. Only the revoke prevents a handicap write, and it's verified
+to return `42501 permission denied`.
+
+The **read** path stays open. The organiser changes a handicap either by editing `PLAYERS` in the
+source and pushing, or by editing the `players` table in the Supabase dashboard — a dashboard
+edit propagates live to every phone via `applyRemotePlayer`.
+
+`flush()` drops non-score outbox entries rather than retrying them. A phone still holding a
+handicap edit queued by the pre-lock version would otherwise fail forever and stall every score
+behind it.
+
 ## Open work
 
 - **Course data is still unverified.** See the section above — this is now the largest remaining
   risk to the app being *correct* rather than merely working, since wrong ratings or stroke
   indexes silently produce wrong handicaps and wrong Stableford points all week.
-- The app has never been run against a live Supabase project. The sync logic is covered by
-  offline tests, but end-to-end multi-device sync should be verified once credentials exist.
+- **Unplayed days award a phantom Sixes bonus.** With no scores entered, all four players in a
+  flight tie on zero games won, so the tie-averaging in `computeSixes` hands everyone
+  `(5+2+0−2)/4 = 1.25`. Days 3 and 4 currently show 1.3 for every player, inflating trip totals
+  by 2.5 each. It self-corrects once scores are entered and it's uniform, so it doesn't change
+  the ranking — but the totals are wrong until the trip finishes. Fix would be to skip the bonus
+  entirely for a flight with no playable holes. Not done: it predates this work and nobody has
+  asked.
+- Live sync is verified end-to-end (realtime delivery, stale-write rejection, RLS enforcement).
+  Days 1 and 2 are fully scored in the database.
