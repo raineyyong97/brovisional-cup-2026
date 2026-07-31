@@ -3,6 +3,12 @@
 A shared live scoreboard for a 4-day, 8-player golf trip in Phuket. Any player can enter scores
 from their own phone; everyone else's view updates within about a second.
 
+**Live:** https://raineyyong97.github.io/brovisional-cup-2026/
+
+⚠️ **Not yet shared.** The site is deployed and working, but `SUPABASE_CONFIG` in `sync.js` is
+still empty, so every phone currently keeps its own independent copy — the status pill says
+`Local only — not synced`. Do step 1 below to turn it into a real shared scoreboard.
+
 ## Files
 
 | File | What it is |
@@ -17,7 +23,7 @@ from their own phone; everyone else's view updates within about a second.
 
 ## Setup
 
-Two steps need your account credentials, so they're yours to do rather than mine.
+Hosting is done (GitHub Pages, from `main`). One step remains, and it needs an account signup.
 
 **1. Create the Supabase project and run the schema.**
 
@@ -36,13 +42,16 @@ export const SUPABASE_CONFIG = {
 
 Until those are filled in the app runs fine but stays local-only, and the status pill says so.
 
-**2. Deploy to Netlify.**
+**2. Push, and it's live.**
 
-Drag this folder onto [app.netlify.com/drop](https://app.netlify.com/drop) — no CLI, no account
-strictly required for a first look. For a URL that survives updates, connect the folder as a site
-in the Netlify dashboard instead.
+```bash
+git add sync.js && git commit -m "Add Supabase credentials" && git push
+```
 
-Then send the 8 players the URL.
+GitHub Pages rebuilds in about a minute. Confirm the status pill reads `Live` rather than
+`Local only — not synced`, then send the 8 players the URL.
+
+`netlify.toml` is kept in case the group would rather host there later; it isn't used by Pages.
 
 ## How syncing works
 
