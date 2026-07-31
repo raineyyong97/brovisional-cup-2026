@@ -59,9 +59,12 @@ echo "✓ Project reachable and schema present."
 # --- 2. confirm the write path exists ----------------------------------------
 
 echo "→ Checking the upsert function is callable…"
+# Probes with a real player, no strokes, and a 1970 timestamp. The merge rule
+# rejects it if that cell already has a score, and otherwise it writes a blank
+# row that renders as an empty box — so probing never leaves visible junk.
 rpc=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$URL/rest/v1/rpc/upsert_score" \
        -H "apikey: $KEY" -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
-       -d '{"p_day":0,"p_player":"__probe__","p_hole":0,"p_strokes":null,"p_updated_at":"1970-01-01T00:00:00Z","p_device":"probe"}')
+       -d '{"p_day":0,"p_player":"Bob","p_hole":0,"p_strokes":null,"p_updated_at":"1970-01-01T00:00:00Z","p_device":"probe"}')
 if [ "$rpc" != "200" ] && [ "$rpc" != "204" ]; then
   echo "✗ upsert_score is not callable (HTTP $rpc)."
   echo "  Re-run supabase/schema.sql — the grants at the bottom are what expose it."
