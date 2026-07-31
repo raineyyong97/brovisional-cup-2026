@@ -93,7 +93,16 @@ revoke all on function upsert_score(smallint, text, smallint, smallint, timestam
 revoke all on function upsert_player(text, numeric, timestamptz, text) from public;
 
 grant execute on function upsert_score(smallint, text, smallint, smallint, timestamptz, text) to anon, authenticated;
-grant execute on function upsert_player(text, numeric, timestamptz, text) to anon, authenticated;
+
+-- Handicaps are admin-managed and deliberately NOT grantable to anon. The app's
+-- HI inputs are disabled, but that is only cosmetic — the source and API key are
+-- public, so a disabled input stops accidents, not intent. Withholding execute
+-- here is what actually enforces it: no client can write a handicap at all.
+--
+-- The organiser changes handicaps by editing PLAYERS in the source and pushing,
+-- or by editing the players table in the Supabase dashboard. The read path stays
+-- open, so a dashboard edit propagates live to every phone.
+revoke execute on function upsert_player(text, numeric, timestamptz, text) from anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- Realtime

@@ -182,15 +182,11 @@ export function createSync({ SCORES, PLAYERS, onRemoteChange, onStatus, config =
     });
   }
 
-  function recordPlayer(name, hi){
-    enqueue({
-      kind: 'player',
-      key: playerKey(name),
-      name, hi: Number(hi),
-      updated_at: nextTs(),
-      device
-    });
-  }
+  // Note: there is deliberately no recordPlayer. Handicaps are admin-managed —
+  // the inputs are disabled and `execute` on upsert_player is revoked from anon,
+  // so the app has no way to write one. The READ path stays: applyRemotePlayer
+  // still merges handicap changes made in the Supabase dashboard, so the
+  // organiser can adjust a handicap and every phone picks it up live.
 
   // -- flushing -------------------------------------------------------------
 
@@ -215,13 +211,10 @@ export function createSync({ SCORES, PLAYERS, onRemoteChange, onStatus, config =
             p_strokes: e.strokes, p_updated_at: new Date(e.updated_at).toISOString(), p_device: e.device
           });
           if(error) throw error;
-        } else {
-          const { error } = await sb.rpc('upsert_player', {
-            p_name: e.name, p_hi: e.hi,
-            p_updated_at: new Date(e.updated_at).toISOString(), p_device: e.device
-          });
-          if(error) throw error;
         }
+        // Anything else is a handicap edit queued by an older version of the app.
+        // The server no longer accepts those, and retrying forever would wedge the
+        // queue and stall every score behind it — so drop it and move on.
         // Drop only this entry, and only if it wasn't superseded while in flight.
         outbox = outbox.filter(x => !(x.key === e.key && x.updated_at <= e.updated_at));
         persistOutbox();
@@ -337,5 +330,5 @@ export function createSync({ SCORES, PLAYERS, onRemoteChange, onStatus, config =
     scheduleFlush(0);
   }
 
-  return { hydrate, start, recordScore, recordPlayer, state, _outbox: () => outbox };
+  return { hydrate, start, recordScore, state, _outbox: () => outbox };
 }

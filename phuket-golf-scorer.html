@@ -223,6 +223,10 @@ table.score td.par-row, table.score td.si-row{
 .save-status.warn{border-color:var(--gold);color:var(--green-900);font-weight:600;}
 .side-bet{margin:12px 0;padding:9px 13px;border-left:3px solid var(--gold);background:rgba(201,162,39,0.09);
           border-radius:0 6px 6px 0;font-size:12px;line-height:1.5;color:var(--green-900);}
+.locked-tag{font-size:10px;letter-spacing:.08em;text-transform:uppercase;font-weight:600;vertical-align:middle;
+            margin-left:7px;padding:2px 7px;border-radius:10px;background:var(--line);color:var(--muted);}
+.lock-note{margin-top:9px;font-size:11px;color:var(--muted);}
+.hi-input:disabled{background:transparent;color:var(--muted);cursor:not-allowed;opacity:0.8;}
 
 .quick-entry{
   background:var(--white);
@@ -340,15 +344,16 @@ input.qgross{
 <div class="wrap">
 
   <div class="setup">
-    <h3>Players &amp; handicap index</h3>
+    <h3>Players &amp; handicap index <span class="locked-tag">locked</span></h3>
     <div class="hi-grid" id="hi-grid"></div>
+    <div class="lock-note">Handicaps are set by the organiser and can't be changed from the app.</div>
   </div>
 
   <div class="tabs" id="tabs"></div>
 
   <div id="panels"></div>
 
-  <div class="note">Course handicaps use White tee ratings (Loch Palm 68.2/115, par 71 — 2019 Jon Morrow redesign; Blue Canyon Canyon 70.4/131; Blue Canyon Lakes 69.3/124; Red Mountain 68.6/121). Flights reshuffle every day so everyone plays with everyone at least once over the trip. Strokes given between any two flight-mates equal the difference in their Course Handicap for that day, applied to the lowest stroke-index holes first.</div>
+  <div class="note">Course handicaps use White tee ratings (Day 1 Loch Palm 68.2/115, par 71 — 2019 Jon Morrow redesign; Day 2 Blue Canyon Canyon 70.4/131; Day 3 Red Mountain 68.6/121; Day 4 Blue Canyon Lakes 69.3/124). Flights reshuffle every day so everyone plays with everyone at least once over the trip. Strokes given between any two flight-mates equal the difference in their Course Handicap for that day, applied to the lowest stroke-index holes first.</div>
 </div>
 
 <div class="save-status" id="save-status">Saved</div>
@@ -369,15 +374,18 @@ const COURSES = [
       {par:4,si:16},{par:3,si:8},{par:4,si:2},{par:4,si:18},{par:4,si:4},{par:5,si:12},{par:3,si:6},{par:4,si:10},{par:5,si:14},
       {par:4,si:11},{par:5,si:1},{par:4,si:5},{par:4,si:15},{par:3,si:13},{par:5,si:7},{par:4,si:17},{par:3,si:3},{par:4,si:9}
     ]},
-  { key:'day2', name:'Blue Canyon — Lakes Course', rating:69.3, slope:124, par:72,
-    holes:[
-      {par:4,si:9},{par:3,si:13},{par:4,si:5},{par:4,si:1},{par:4,si:11},{par:4,si:15},{par:4,si:7},{par:3,si:17},{par:5,si:3},
-      {par:5,si:4},{par:4,si:14},{par:3,si:16},{par:5,si:10},{par:4,si:6},{par:5,si:8},{par:4,si:12},{par:3,si:18},{par:4,si:2}
-    ]},
-  { key:'day3', name:'Red Mountain Golf Course', rating:68.6, slope:121, par:72,
+  // Day 3 and Day 4 are swapped relative to the original plan: the group plays
+  // Red Mountain on day 3 and Blue Canyon Lakes on day 4. Only COURSES moved —
+  // DAILY_FLIGHTS is tied to the day, not the venue, so the groupings stay put.
+  { key:'day2', name:'Red Mountain Golf Course', rating:68.6, slope:121, par:72,
     holes:[
       {par:4,si:7},{par:5,si:5},{par:3,si:15},{par:5,si:11},{par:4,si:3},{par:4,si:1},{par:3,si:17},{par:4,si:13},{par:4,si:9},
       {par:5,si:2},{par:3,si:18},{par:4,si:16},{par:3,si:14},{par:4,si:12},{par:5,si:10},{par:4,si:4},{par:4,si:8},{par:4,si:6}
+    ]},
+  { key:'day3', name:'Blue Canyon — Lakes Course', rating:69.3, slope:124, par:72,
+    holes:[
+      {par:4,si:9},{par:3,si:13},{par:4,si:5},{par:4,si:1},{par:4,si:11},{par:4,si:15},{par:4,si:7},{par:3,si:17},{par:5,si:3},
+      {par:5,si:4},{par:4,si:14},{par:3,si:16},{par:5,si:10},{par:4,si:6},{par:5,si:8},{par:4,si:12},{par:3,si:18},{par:4,si:2}
     ]}
 ];
 
@@ -627,7 +635,8 @@ function renderHiGrid(){
   grid.innerHTML = PLAYERS.map(p=>`
     <div class="hi-card">
       <span>${p.name}</span>
-      <input type="number" step="0.1" class="hi-input" data-player="${p.name}" value="${p.hi}">
+      <input type="number" step="0.1" class="hi-input" data-player="${p.name}" value="${p.hi}"
+             disabled aria-readonly="true" title="Handicaps are set by the organiser">
     </div>
   `).join('');
 }
@@ -700,6 +709,57 @@ function sixesBlock(dayIdx, flightKey){
   `;
 }
 
+// Gross strokes — what everyone actually shot, before handicaps.
+//
+// Deliberately NOT affected by SIDE_BETS. Those exchange *net* scores; gross is
+// what a player physically hit, and "how everyone's shooting" should stay a
+// record of ball-striking rather than of side agreements.
+//
+// `toPar` is measured against the par of the holes actually played, not the full
+// course. That keeps it honest mid-round: 40 strokes through 9 holes reads +4,
+// not the nonsensical −31 you'd get comparing against a par-71 course.
+function grossFor(dayIdx){
+  const course = COURSES[dayIdx];
+  const out = {};
+  PLAYERS.forEach(p=>{
+    let strokes = 0, holes = 0, par = 0;
+    for(let h=0; h<18; h++){
+      const raw = SCORES[dayIdx][p.name][h];
+      if(raw === '' || raw === null || raw === undefined) continue;
+      const g = parseInt(raw,10);
+      if(isNaN(g)) continue;
+      strokes += g; holes++; par += course.holes[h].par;
+    }
+    out[p.name] = { strokes, holes, par, toPar: strokes - par };
+  });
+  return out;
+}
+
+function fmtToPar(n){ return n === 0 ? 'E' : (n > 0 ? '+'+n : String(n)); }
+
+// Low score wins here, the opposite of the championship table — so players with
+// nothing entered must sort to the bottom rather than leading on zero strokes.
+function byGross(agg){
+  return (a,b)=>{
+    const A = agg[a.name], B = agg[b.name];
+    if(!A.holes && !B.holes) return 0;
+    if(!A.holes) return 1;
+    if(!B.holes) return -1;
+    return A.toPar - B.toPar || A.strokes - B.strokes;
+  };
+}
+
+function grossBlock(dayIdx){
+  const g = grossFor(dayIdx);
+  const rows = PLAYERS.slice().sort(byGross(g)).map(p=>{
+    const d = g[p.name];
+    if(!d.holes) return `<div class="daytotal-row"><span>${p.name}</span><span class="val" style="opacity:0.4;">—</span></div>`;
+    const thru = d.holes < 18 ? `<span style="opacity:0.6;font-size:11px;"> thru ${d.holes}</span>` : '';
+    return `<div class="daytotal-row"><span>${p.name}${thru}</span><span class="val">${d.strokes} <span style="opacity:0.65;">(${fmtToPar(d.toPar)})</span></span></div>`;
+  }).join('');
+  return `<div class="daytotal"><h4>Gross strokes — how everyone's shooting</h4>${rows}</div>`;
+}
+
 function dayTotalsBlock(dayIdx){
   const {points, nets} = computeNets(dayIdx);
   const bonusX = computeSixes(dayIdx,'X',nets).bonus;
@@ -730,6 +790,7 @@ function renderDayPanel(dayIdx){
     </details>
     ${sixesBlock(dayIdx,'X')}
     ${sixesBlock(dayIdx,'Y')}
+    ${grossBlock(dayIdx)}
     ${dayTotalsBlock(dayIdx)}
   `;
 }
@@ -756,11 +817,44 @@ function renderLeaderboard(){
     return `<tr class="${i===0?'leader':''}"><td>${i+1}</td><td class="pname">${p.name}</td>${t.days.map(d=>`<td>${Math.round(d*10)/10}</td>`).join('')}<td class="total">${Math.round(t.grand*10)/10}</td></tr>`;
   }).join('');
   return `<div id="leaderboard-panel">
+    <h3 style="margin:0 0 8px;">Championship — Net Stableford + Sixes</h3>
     <table>
       <thead><tr><th>#</th><th style="text-align:left;">Player</th><th>Day 1</th><th>Day 2</th><th>Day 3</th><th>Day 4</th><th>Total</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
+    ${renderGrossSummary()}
   </div>`;
+}
+
+// Separate table on purpose: this ranks low-to-high while the championship ranks
+// high-to-low, and putting opposite-direction numbers in one grid invites
+// misreading the leaderboard.
+function renderGrossSummary(){
+  const per = COURSES.map((c,d)=> grossFor(d));
+  const agg = {};
+  PLAYERS.forEach(p=>{
+    let strokes = 0, holes = 0, toPar = 0;
+    per.forEach(g=>{ strokes += g[p.name].strokes; holes += g[p.name].holes; toPar += g[p.name].toPar; });
+    agg[p.name] = { strokes, holes, toPar };
+  });
+  const rows = PLAYERS.slice().sort(byGross(agg)).map((p,i)=>{
+    const cells = per.map(g=>{
+      const d = g[p.name];
+      if(!d.holes) return `<td style="opacity:0.35;">—</td>`;
+      const thru = d.holes < 18 ? `<span style="opacity:0.55;font-size:10px;"> (${d.holes})</span>` : '';
+      return `<td>${d.strokes}${thru}</td>`;
+    }).join('');
+    const t = agg[p.name];
+    const total = t.holes ? `${t.strokes} <span style="opacity:0.65;font-size:11px;">${fmtToPar(t.toPar)}</span>` : '—';
+    return `<tr class="${i===0 && t.holes ? 'leader' : ''}"><td>${t.holes ? i+1 : '–'}</td><td class="pname">${p.name}</td>${cells}<td class="total">${total}</td></tr>`;
+  }).join('');
+  return `
+    <h3 style="margin:26px 0 8px;">Gross strokes — how everyone's shooting</h3>
+    <table>
+      <thead><tr><th>#</th><th style="text-align:left;">Player</th><th>Day 1</th><th>Day 2</th><th>Day 3</th><th>Day 4</th><th>Total</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="note" style="margin-top:10px;">Raw strokes before handicap, ranked low to high. Score to par is measured against the holes actually played, so it stays accurate mid-round; a bracketed number means an unfinished round. Unaffected by side bets, which exchange net scores rather than strokes played.</div>`;
 }
 
 function renderPanels(){
@@ -860,13 +954,9 @@ document.addEventListener('change', (e)=>{
 });
 
 document.addEventListener('input', (e)=>{
-  if(e.target.classList.contains('hi-input')){
-    const name = e.target.getAttribute('data-player');
-    const p = getPlayer(name);
-    const val = parseFloat(e.target.value);
-    if(!isNaN(val)){ p.hi = val; sync.recordPlayer(name, val); }
-    refreshCurrentDay();
-  }
+  // No hi-input branch: handicaps are admin-managed. The inputs are disabled,
+  // and the database has had the app's permission to write them revoked, so
+  // there is deliberately no code path here that could change one.
   if(e.target.classList.contains('gross')){
     const day = e.target.getAttribute('data-day');
     const name = e.target.getAttribute('data-player');
