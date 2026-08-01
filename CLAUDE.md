@@ -82,10 +82,14 @@ The exhaustive search also confirmed the original note: with 8 players in two fl
 hand-built schedule was nonetheless suboptimal — 4 pairs at 3× and 12 pairs at 1×, where the
 theoretical best was 20 pairs at 2× and 8 at 1×.
 
-Current schedule, chosen deliberately: **21 of 28 pairs share a flight exactly twice and no pair
-exceeds twice.** The accepted cost is 4 pairs who never share a flight — Bob+Weng, Daryl+Junyi,
-Rainey+Song, Kai+Wilson. The alternative (everyone meets at least once) was rejected because it
-drops to only 9 pairs at twice and forces 4 pairs to 3×.
+Day 3 was set by that optimisation. **Day 4 then overrode it by request**: the top four on the
+leaderboard after day 3 (Weng, Rainey, Daryl, Song) play together as a leaders' flight, with the
+other four together. This is a deliberate format choice and it costs fairness — 14 pairs at
+exactly twice instead of 21, three pairs pushed to 3×, and the handicap spread between flights
+widens from 0.0 to 1.5. If the leaders' flight is ever dropped, the fairness-optimal day 4 is
+`X:['Bob','Junyi','Song','Wilson'], Y:['Weng','Daryl','Rainey','Kai']`, which restores 21/28.
+
+Within each day-4 flight the order pairs 1st with 4th against 2nd with 3rd for the opening six.
 
 The binding constraint is Kai: he plays only days 1, 2 and 4, and his unmet pairs were Weng and
 Wilson. Covering both would force Weng+Wilson — already at 2 from days 1–2 — up to 3.
@@ -203,6 +207,10 @@ Two properties worth preserving:
 - **Gross is deliberately unaffected by `SIDE_BETS`.** Those exchange net scores; gross is what a
   player physically hit, and "how everyone's shooting" should stay a record of ball-striking.
 
+Each day also shows a **front 9 / back 9** split. `nineText` renders a nine as `–` until it has
+all 9 holes and appends a dot while it is still in progress, for the same reason: a part-played
+nine would otherwise read as an excellent one.
+
 It lives in its own table because it ranks low-to-high while the championship ranks high-to-low.
 Don't merge them — opposite-direction numbers in one grid invite misreading the leaderboard.
 `byGross` sorts players with no scores to the bottom, so nobody leads on zero strokes.
@@ -233,7 +241,15 @@ behind it.
   risk to the app being *correct* rather than merely working, since wrong ratings or stroke
   indexes silently produce wrong handicaps and wrong Stableford points all week.
 - Live sync is verified end-to-end (realtime delivery, stale-write rejection, RLS enforcement).
-  Days 1 and 2 are fully scored in the database.
+  Days 1, 2 and 3 are fully scored in the database.
+
+### Fixed: stale day panels
+
+Remote updates only re-render the panel that is currently visible, and switching tabs used to
+just toggle CSS classes. Because the initial paint happens before the first Supabase pull
+completes, any day you hadn't looked at since loading showed an empty scorecard until you
+reloaded. The tab handler now re-renders the day it switches to. If day panels are ever made to
+re-render some other way, keep that guarantee.
 
 ## Absences and short flights
 
@@ -241,10 +257,22 @@ behind it.
 player is left out of `DAILY_FLIGHTS` for that day entirely, scores 0, and renders as "not
 playing" in the day totals and "—" in the gross table.
 
-Day 3 therefore has 7 players split 4 + 3. A 3-player flight cannot play partners format, so
-`computeThreeWay` runs **3-way individual match play**: each hole goes to the outright lowest net
-(a tie for lowest halves the hole), most holes wins the 6-hole game, and the bonus slots are
-`[5, 2, −2]` rather than `[5, 2, 0, −2]`. `computeSixes` dispatches on flight length.
+Day 3 therefore has 7 players split 4 + 3.
+
+`FLIGHT_FORMAT` declares per-flight format overrides; a flight with no entry plays the default
+for its size (4 → Sixes, 3 → `computeThreeWay`). Day 3 flight 2 is recorded as **2-v-1** because
+that is what the group actually played: Song and Junyi as a pair against Weng, over one 18-hole
+match rather than three 6-hole games. The pair's better net plays the solo player's net on each
+hole.
+
+**The 2-v-1 bonus pool is deliberately held at +5**, matching every other flight (4-player Sixes
+is 5+2+0−2 = 5; 3-way is 5+2−2 = 5). The pair winning pays +3.5 each and −2 to the solo player;
+the solo player winning pays +5 and 0 to the pair; a halved match splits 5/3 three ways. Paying
+the winning pair +5 each would inject +8 into that flight and hand championship points to players
+merely for being in the larger team — don't "simplify" it that way.
+
+`computeThreeWay` is retained as the fallback for any future 3-player flight without a declared
+format.
 
 `awardBonus` is shared by both formats and takes an `anyPlayable` count. This fixes a real bug:
 with no scores entered, every player tied on zero and the tie-averaging handed each of them

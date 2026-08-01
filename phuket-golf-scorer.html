@@ -425,8 +425,24 @@ const DAILY_FLIGHTS = [
   { X:['Bob','Junyi','Rainey','Kai'], Y:['Weng','Daryl','Song','Wilson'] },
   { X:['Bob','Daryl','Song','Kai'], Y:['Weng','Rainey','Junyi','Wilson'] },
   { X:['Bob','Daryl','Rainey','Wilson'], Y:['Weng','Junyi','Song'] },
-  { X:['Bob','Junyi','Song','Wilson'], Y:['Weng','Daryl','Rainey','Kai'] }
+  // Day 4 is a leaders' flight by request: the top four on the leaderboard after
+  // day 3 (Weng, Rainey, Daryl, Song) play together, the other four together.
+  // This overrides the pairing optimisation — see the note above. Within each
+  // flight the order pairs 1st with 4th against 2nd with 3rd for the opening six.
+  { X:['Weng','Song','Rainey','Daryl'], Y:['Bob','Kai','Junyi','Wilson'] }
 ];
+
+// Per-flight format overrides. A flight with no entry plays the default for its
+// size: 4 players -> Sixes, 3 players -> 3-way individual match play.
+//
+// Day 3 flight 2 actually played 2-v-1 — Song and Junyi as a pair against Weng —
+// so it is recorded as played rather than as scheduled.
+const FLIGHT_FORMAT = {
+  2: { Y: { type:'2v1', team:['Song','Junyi'], solo:'Weng' } }
+};
+function formatFor(dayIdx, flightKey){
+  return (FLIGHT_FORMAT[dayIdx] || {})[flightKey] || null;
+}
 
 // Players who aren't playing on a given day. They score nothing and are excluded
 // from that day's flights entirely.
@@ -538,6 +554,49 @@ function awardBonus(ranked, gamesWon, holesWonTotal, slots, anyPlayable){
   return bonus;
 }
 
+// 2-v-1: a pair playing their better net against a single opponent, as ONE
+// 18-hole match rather than three 6-hole games.
+//
+// The bonus pool is deliberately held at +5, matching what every other flight
+// distributes (4-player Sixes is 5+2+0−2 = 5; 3-way is 5+2−2 = 5). Paying the
+// winning pair +5 each would inject +8 into this flight and hand championship
+// points to players merely for being in the larger team.
+function computeTwoVsOne(fmt, nets){
+  const team = fmt.team, solo = fmt.solo, all = [...team, solo];
+  const won = {}; all.forEach(p=> won[p]=0);
+  let playable = 0;
+  for(let h=0; h<18; h++){
+    const t = team.map(p=> nets[p][h]);
+    const s = nets[solo][h];
+    if(s===null || t.some(v=> v===null)) continue;
+    playable++;
+    const best = Math.min(...t);
+    if(best < s) team.forEach(p=> won[p]++);        // pair takes the hole
+    else if(s < best) won[solo]++;                  // solo takes the hole
+  }
+  const teamHoles = won[team[0]], soloHoles = won[solo];
+  const bonus = {};
+  if(!playable){
+    all.forEach(p=> bonus[p]=0);
+  } else if(teamHoles > soloHoles){
+    team.forEach(p=> bonus[p] = 3.5);               // 3.5 + 3.5 − 2 = +5
+    bonus[solo] = -2;
+  } else if(soloHoles > teamHoles){
+    bonus[solo] = 5;                                // 5 + 0 + 0 = +5
+    team.forEach(p=> bonus[p] = 0);
+  } else {
+    all.forEach(p=> bonus[p] = 5/3);                // halved match splits the pool
+  }
+  const winner = !playable || teamHoles===soloHoles ? null : (teamHoles>soloHoles ? team : [solo]);
+  const gamesWon = {}; all.forEach(p=> gamesWon[p] = winner && winner.includes(p) ? 1 : 0);
+  const ranked = all.slice().sort((a,b)=> bonus[b]-bonus[a] || won[b]-won[a]);
+  return {
+    segResults: [{ label:'Holes 1–18', twoVsOne:true, team, solo,
+                   teamHoles, soloHoles, winner, playable }],
+    gamesWon, holesWonTotal: won, ranked, bonus, twoVsOne:true
+  };
+}
+
 // 3-way individual match play, used when a flight is short a player.
 // Each hole goes to the outright lowest net (a tie for lowest gives nobody the
 // hole); most holes in a 6-hole segment wins that segment.
@@ -590,8 +649,10 @@ function sixesSegments(all){
 
 function computeSixes(dayIdx, flightKey, nets){
   const all = DAILY_FLIGHTS[dayIdx][flightKey] || [];
-  // A 3-player flight (day 3, Kai out) can't play partners format, so it plays
-  // 3-way individual match play instead: lowest net takes the hole, most holes
+  const fmt = formatFor(dayIdx, flightKey);
+  if(fmt && fmt.type === '2v1') return computeTwoVsOne(fmt, nets);
+  // A 3-player flight with no declared format can't play partners, so it falls
+  // back to 3-way individual match play: lowest net takes the hole, most holes
   // takes the 6-hole segment. Bonus slots differ because there are 3 places.
   if(all.length === 3) return computeThreeWay(all, nets);
 
@@ -765,6 +826,17 @@ function sixesBlock(dayIdx, flightKey){
   const result = computeSixes(dayIdx, flightKey, nets);
   const label = flightKey==='X' ? 'Flight 1' : 'Flight 2';
   const segHtml = result.segResults.map(seg=>{
+    if(seg.twoVsOne){
+      const winnerText = seg.winner
+        ? (seg.winner.length>1 ? `${seg.team.join(' + ')} win` : `${seg.solo} wins`) +
+          ` (${Math.max(seg.teamHoles,seg.soloHoles)}–${Math.min(seg.teamHoles,seg.soloHoles)})`
+        : (seg.playable>0 ? 'Halved' : 'Awaiting scores');
+      return `<div class="segment">
+        <div><b>${seg.team.join(' + ')}</b> vs <b>${seg.solo}</b><br>
+        <span class="holes">${seg.label} — holes won ${seg.teamHoles}–${seg.soloHoles}</span></div>
+        <div class="winner">${winnerText}</div>
+      </div>`;
+    }
     if(seg.threeWay){
       const tally = Object.keys(seg.won).map(p=>`${p} ${seg.won[p]}`).join(' · ');
       const winnerText = seg.winner ? `${seg.winner[0]} wins` : (seg.playable>0 ? 'Tied' : 'Awaiting scores');
@@ -786,7 +858,8 @@ function sixesBlock(dayIdx, flightKey){
   }).join('');
   return `
     <div class="sixes-section">
-      <h3>${result.threeWay ? '3-way match play' : 'Sixes'} — ${label}</h3>
+      <h3>${result.twoVsOne ? '2 v 1 match' : result.threeWay ? '3-way match play' : 'Sixes'} — ${label}</h3>
+      ${result.twoVsOne ? `<div class="side-bet">Kai was out, so this flight played 2 v 1 over all 18 holes — the pair's better net against the single player. Bonus pool is held at +5 to match every other flight: the pair win +3.5 each and the solo player −2, or the solo player wins +5 and the pair take 0.</div>` : ''}
       ${result.threeWay ? `<div class="side-bet">Only 3 players in this flight, so partners format isn't possible. Each hole goes to the outright lowest net; most holes wins the 6-hole game. Bonus is +5 / +2 / −2.</div>` : ''}
       ${segHtml}
       <table class="rank-table">
@@ -812,17 +885,28 @@ function grossFor(dayIdx){
   const course = COURSES[dayIdx];
   const out = {};
   PLAYERS.forEach(p=>{
-    let strokes = 0, holes = 0, par = 0;
+    const nine = [ {strokes:0,holes:0,par:0}, {strokes:0,holes:0,par:0} ];
     for(let h=0; h<18; h++){
       const raw = SCORES[dayIdx][p.name][h];
       if(raw === '' || raw === null || raw === undefined) continue;
       const g = parseInt(raw,10);
       if(isNaN(g)) continue;
-      strokes += g; holes++; par += course.holes[h].par;
+      const n = nine[h<9 ? 0 : 1];
+      n.strokes += g; n.holes++; n.par += course.holes[h].par;
     }
-    out[p.name] = { strokes, holes, par, toPar: strokes - par };
+    const strokes = nine[0].strokes + nine[1].strokes;
+    const holes   = nine[0].holes   + nine[1].holes;
+    const par     = nine[0].par     + nine[1].par;
+    out[p.name] = { strokes, holes, par, toPar: strokes - par,
+                    front: nine[0], back: nine[1] };
   });
   return out;
+}
+
+// A nine is only meaningful once it's complete; a part-played nine would read as
+// a great score. Shown as "–" until all 9 are in.
+function nineText(n){
+  return n.holes === 9 ? `${n.strokes}` : (n.holes ? `${n.strokes}·` : '–');
 }
 
 function fmtToPar(n){ return n === 0 ? 'E' : (n > 0 ? '+'+n : String(n)); }
@@ -845,9 +929,12 @@ function grossBlock(dayIdx){
     const d = g[p.name];
     if(!d.holes) return `<div class="daytotal-row"><span>${p.name}</span><span class="val" style="opacity:0.4;">—</span></div>`;
     const thru = d.holes < 18 ? `<span style="opacity:0.6;font-size:11px;"> thru ${d.holes}</span>` : '';
-    return `<div class="daytotal-row"><span>${p.name}${thru}</span><span class="val">${d.strokes} <span style="opacity:0.65;">(${fmtToPar(d.toPar)})</span></span></div>`;
+    const splits = `<span style="opacity:0.55;font-size:11px;">${nineText(d.front)} / ${nineText(d.back)}</span>`;
+    return `<div class="daytotal-row"><span>${p.name}${thru}</span><span class="val">${splits} &nbsp; ${d.strokes} <span style="opacity:0.65;">(${fmtToPar(d.toPar)})</span></span></div>`;
   }).join('');
-  return `<div class="daytotal"><h4>Gross strokes — how everyone's shooting</h4>${rows}</div>`;
+  return `<div class="daytotal"><h4>Gross strokes — how everyone's shooting</h4>
+    <div style="font-size:11px;color:var(--muted);margin:-4px 0 8px;">front 9 / back 9 · total (to par)</div>
+    ${rows}</div>`;
 }
 
 function dayTotalsBlock(dayIdx){
@@ -935,7 +1022,8 @@ function renderGrossSummary(){
       const d = g[p.name];
       if(!d.holes) return `<td style="opacity:0.35;">—</td>`;
       const thru = d.holes < 18 ? `<span style="opacity:0.55;font-size:10px;"> (${d.holes})</span>` : '';
-      return `<td>${d.strokes}${thru}</td>`;
+      const splits = `<div style="opacity:0.5;font-size:10px;">${nineText(d.front)}/${nineText(d.back)}</div>`;
+      return `<td>${d.strokes}${thru}${splits}</td>`;
     }).join('');
     const t = agg[p.name];
     const total = t.holes ? `${t.strokes} <span style="opacity:0.65;font-size:11px;">${fmtToPar(t.toPar)}</span>` : '—';
@@ -947,7 +1035,7 @@ function renderGrossSummary(){
       <thead><tr><th>#</th><th style="text-align:left;">Player</th><th>Day 1</th><th>Day 2</th><th>Day 3</th><th>Day 4</th><th>Total</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="note" style="margin-top:10px;">Raw strokes before handicap, ranked low to high. Score to par is measured against the holes actually played, so it stays accurate mid-round; a bracketed number means an unfinished round. Unaffected by side bets, which exchange net scores rather than strokes played.</div>`;
+    <div class="note" style="margin-top:10px;">Raw strokes before handicap, ranked low to high. The small figures under each day are front 9 / back 9. Score to par is measured against the holes actually played, so it stays accurate mid-round; a bracketed number means an unfinished round, and a nine still in progress shows a dot. Unaffected by side bets, which exchange net scores rather than strokes played.</div>`;
 }
 
 function renderPanels(){
@@ -1005,6 +1093,13 @@ document.addEventListener('click', (e)=>{
     if(target) target.classList.add('active');
     if(activeTab==='leaderboard'){
       document.getElementById('panel-leaderboard').innerHTML = renderLeaderboard();
+    }else{
+      // Re-render on the way in. Remote updates only refresh the panel that is
+      // currently visible, so without this a day you haven't looked at since the
+      // last sync still shows the scorecard as it was when the page first
+      // rendered — usually empty, because the initial paint happens before the
+      // first pull from Supabase completes.
+      refreshCurrentDay();
     }
     return;
   }
